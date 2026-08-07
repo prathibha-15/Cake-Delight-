@@ -6,20 +6,20 @@ import jakarta.validation.constraints.NotNull;
 
 public class CakeRequest {
 
-    @NotBlank
+    @NotBlank(message = "Cake name is required")
     private String name;
 
     private String description;
 
-    @NotBlank
+    @NotBlank(message = "Category is required")
     private String category;
 
-    @NotNull
-    @Min(1)
+    @NotNull(message = "Price is required")
+    @Min(value = 1, message = "Price must be greater than 0")
     private Double price;
 
-    @NotNull
-    @Min(0)
+    @NotNull(message = "Stock is required")
+    @Min(value = 0, message = "Stock cannot be negative")
     private Integer stock;
 
     private String imageUrl;

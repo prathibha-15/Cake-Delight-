@@ -1,5 +1,5 @@
 package com.cakedelight.catalog.service.impl;
-
+import com.cakedelight.catalog.exception.ResourceNotFoundException;
 import com.cakedelight.catalog.dto.CakeRequest;
 import com.cakedelight.catalog.dto.CakeResponse;
 import com.cakedelight.catalog.entity.Cake;
@@ -45,7 +45,7 @@ public class CakeServiceImpl implements CakeService {
     @Override
     public CakeResponse getCakeById(Long id) {
         Cake cake = cakeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Cake not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cake not found with id: " + id));
 
         return mapToResponse(cake);
     }
@@ -54,7 +54,7 @@ public class CakeServiceImpl implements CakeService {
     public CakeResponse updateCake(Long id, CakeRequest request) {
 
         Cake cake = cakeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Cake not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cake not found with id: " + id));
 
         cake.setName(request.getName());
         cake.setDescription(request.getDescription());
