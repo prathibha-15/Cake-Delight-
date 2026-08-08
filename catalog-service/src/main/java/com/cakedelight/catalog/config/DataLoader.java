@@ -111,6 +111,16 @@ public class DataLoader {
                         "https://example.com/pineapple.jpg"
                 ));
 
+                repository.save(new Cake(
+                        null,
+                        "Creamy Pistachio",
+                        "A rich pistachio cream celebration cake",
+                        "Celebration",
+                        720.0,
+                        13,
+                        "https://example.com/pistachio.jpg"
+                ));
+
                 System.out.println("Inserted 10 sample cakes successfully.");
 
             } else {
