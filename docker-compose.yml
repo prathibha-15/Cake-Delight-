@@ -109,6 +109,52 @@ services:
     networks:
       - cake-network
 
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: mailhog
+
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+    networks:
+      - cake-network
+
+  notification-service:
+    build:
+      context: ./notification-service
+
+    container_name: notification-service
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+
+    ports:
+      - "8084:8084"
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/notification_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      NOTIFICATION_MAIL_ENABLED: "true"
+      NOTIFICATION_MAIL_FROM: no-reply@cakedelight.local
+      NOTIFICATION_MAIL_TO: demo@cakedelight.local
+      NOTIFICATION_MAIL_SUBJECT_PREFIX: "[Cake Delight]"
+
+    networks:
+      - cake-network
+
 volumes:
   mysql-data:
 
