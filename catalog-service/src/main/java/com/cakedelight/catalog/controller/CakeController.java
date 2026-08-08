@@ -27,26 +27,29 @@ public class CakeController {
         return cakeService.createCake(request);
     }
 
-    
-    @Operation(summary = "Get all cakes")
+    @Operation(summary = "Get all cakes with optional filters")
     @GetMapping
-    public List<CakeResponse> getAllCakes() {
-        return cakeService.getAllCakes();
+    public List<CakeResponse> getAllCakes(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice) {
+        return cakeService.getCakes(category, name, minPrice, maxPrice);
     }
 
-    
-    @Operation(summary = "Get all cakes")
+    @Operation(summary = "Get a cake by id")
     @GetMapping("/{id}")
     public CakeResponse getCakeById(@PathVariable Long id) {
         return cakeService.getCakeById(id);
     }
-    
+
     @Operation(summary = "Update an existing cake")
     @PutMapping("/{id}")
     public CakeResponse updateCake(@PathVariable Long id,
                                    @Valid @RequestBody CakeRequest request) {
         return cakeService.updateCake(id, request);
     }
+
     @Operation(summary = "Delete a cake")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
