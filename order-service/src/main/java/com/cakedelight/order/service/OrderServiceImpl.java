@@ -7,7 +7,9 @@ import com.cakedelight.order.entity.Order;
 import com.cakedelight.order.entity.OrderItem;
 import com.cakedelight.order.enums.OrderStatus;
 import com.cakedelight.order.exception.OrderNotFoundException;
+import com.cakedelight.order.event.OrderCompletedEvent;
 import com.cakedelight.order.mapper.OrderMapper;
+import com.cakedelight.order.rabbitmq.OrderEventPublisher;
 import com.cakedelight.order.repository.BasketItemRepository;
 import com.cakedelight.order.repository.OrderItemRepository;
 import com.cakedelight.order.repository.OrderRepository;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -24,14 +27,17 @@ public class OrderServiceImpl implements OrderService {
     private final BasketItemRepository basketRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OrderEventPublisher orderEventPublisher;
 
     public OrderServiceImpl(BasketItemRepository basketRepository,
                             OrderRepository orderRepository,
-                            OrderItemRepository orderItemRepository) {
+                            OrderItemRepository orderItemRepository,
+                            OrderEventPublisher orderEventPublisher) {
 
         this.basketRepository = basketRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
+        this.orderEventPublisher = orderEventPublisher;
     }
 
     @Override
@@ -74,6 +80,16 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepository.save(order);
 
         orderItemRepository.saveAll(orderItems);
+
+        OrderCompletedEvent orderCompletedEvent = new OrderCompletedEvent(
+                UUID.randomUUID(),
+                savedOrder.getId(),
+                savedOrder.getOrderDate(),
+                savedOrder.getTotalAmount(),
+                savedOrder.getStatus().name()
+        );
+
+        orderEventPublisher.publish(orderCompletedEvent);
 
         basketRepository.deleteAll();
 
