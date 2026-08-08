@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-
-=======
->>>>>>> feature/order-service
 services:
 
   rabbitmq:
@@ -88,6 +84,27 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: guest
       RABBITMQ_PASSWORD: guest
+
+    networks:
+      - cake-network
+
+  rating-service:
+    build:
+      context: ./rating-service
+
+    container_name: rating-service
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    ports:
+      - "8083:8083"
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cake_rating
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Sweetlife&15
 
     networks:
       - cake-network

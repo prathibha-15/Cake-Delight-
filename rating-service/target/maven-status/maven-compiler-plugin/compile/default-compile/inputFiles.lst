@@ -1,0 +1,12 @@
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\controller\RatingController.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\dto\AverageRatingResponse.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\dto\RatingRequest.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\dto\RatingResponse.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\entity\Rating.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\exception\GlobalExceptionHandler.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\exception\ResourceNotFoundException.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\mapper\RatingMapper.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\RatingServiceApplication.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\repository\RatingRepository.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\service\impl\RatingServiceImpl.java
+C:\Users\prath\Desktop\cake-delight\rating-service\src\main\java\com\cakedelight\rating\service\RatingService.java
