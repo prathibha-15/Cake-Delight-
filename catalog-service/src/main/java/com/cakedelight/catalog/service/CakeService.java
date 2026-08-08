@@ -11,6 +11,8 @@ public interface CakeService {
 
     List<CakeResponse> getAllCakes();
 
+    List<CakeResponse> getCakes(String category, String name, Double minPrice, Double maxPrice);
+
     CakeResponse getCakeById(Long id);
 
     CakeResponse updateCake(Long id, CakeRequest request);

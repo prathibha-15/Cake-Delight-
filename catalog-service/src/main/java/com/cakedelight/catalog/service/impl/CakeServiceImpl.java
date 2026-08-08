@@ -3,6 +3,7 @@ import com.cakedelight.catalog.exception.ResourceNotFoundException;
 import com.cakedelight.catalog.dto.CakeRequest;
 import com.cakedelight.catalog.dto.CakeResponse;
 import com.cakedelight.catalog.entity.Cake;
+import com.cakedelight.catalog.mapper.CakeMapper;
 import com.cakedelight.catalog.repository.CakeRepository;
 import com.cakedelight.catalog.service.CakeService;
 import org.springframework.stereotype.Service;
@@ -13,9 +14,11 @@ import java.util.List;
 public class CakeServiceImpl implements CakeService {
 
     private final CakeRepository cakeRepository;
+    private final CakeMapper cakeMapper;
 
-    public CakeServiceImpl(CakeRepository cakeRepository) {
+    public CakeServiceImpl(CakeRepository cakeRepository, CakeMapper cakeMapper) {
         this.cakeRepository = cakeRepository;
+        this.cakeMapper = cakeMapper;
     }
 
     @Override
@@ -31,15 +34,55 @@ public class CakeServiceImpl implements CakeService {
 
         Cake savedCake = cakeRepository.save(cake);
 
-        return mapToResponse(savedCake);
+        return cakeMapper.toResponse(savedCake);
     }
 
     @Override
     public List<CakeResponse> getAllCakes() {
         return cakeRepository.findAll()
                 .stream()
-                .map(this::mapToResponse)
+                .map(cakeMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public List<CakeResponse> getCakes(String category, String name, Double minPrice, Double maxPrice) {
+        if (category != null && !category.isBlank() && name != null && !name.isBlank()) {
+            return cakeRepository.findByCategoryAndNameContainingIgnoreCase(category, name)
+                    .stream()
+                    .map(cakeMapper::toResponse)
+                    .toList();
+        }
+
+        if (category != null && !category.isBlank()) {
+            return cakeRepository.findByCategory(category)
+                    .stream()
+                    .map(cakeMapper::toResponse)
+                    .toList();
+        }
+
+        if (name != null && !name.isBlank()) {
+            return cakeRepository.findByNameContainingIgnoreCase(name)
+                    .stream()
+                    .map(cakeMapper::toResponse)
+                    .toList();
+        }
+
+        if (minPrice != null || maxPrice != null) {
+            Double low = minPrice == null ? 0.0 : minPrice;
+            Double high = maxPrice == null ? Double.MAX_VALUE : maxPrice;
+
+            if (high < low) {
+                throw new IllegalArgumentException("maxPrice cannot be less than minPrice");
+            }
+
+            return cakeRepository.findByPriceBetween(low, high)
+                    .stream()
+                    .map(cakeMapper::toResponse)
+                    .toList();
+        }
+
+        return getAllCakes();
     }
 
     @Override
@@ -47,7 +90,7 @@ public class CakeServiceImpl implements CakeService {
         Cake cake = cakeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cake not found with id: " + id));
 
-        return mapToResponse(cake);
+        return cakeMapper.toResponse(cake);
     }
 
     @Override
@@ -65,24 +108,11 @@ public class CakeServiceImpl implements CakeService {
 
         Cake updatedCake = cakeRepository.save(cake);
 
-        return mapToResponse(updatedCake);
+        return cakeMapper.toResponse(updatedCake);
     }
 
     @Override
     public void deleteCake(Long id) {
         cakeRepository.deleteById(id);
-    }
-
-    private CakeResponse mapToResponse(Cake cake) {
-
-        return new CakeResponse(
-                cake.getId(),
-                cake.getName(),
-                cake.getDescription(),
-                cake.getCategory(),
-                cake.getPrice(),
-                cake.getStock(),
-                cake.getImageUrl()
-        );
     }
 }

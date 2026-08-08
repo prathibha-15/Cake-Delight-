@@ -71,7 +71,47 @@ public class DataLoader {
                         "https://example.com/butterscotch.jpg"
                 ));
 
-                System.out.println("Inserted 5 sample cakes successfully.");
+                repository.save(new Cake(
+                        null,
+                        "Blueberry Cheesecake",
+                        "Creamy blueberry cheesecake",
+                        "Cheesecake",
+                        650.0,
+                        8,
+                        "https://example.com/blueberry.jpg"
+                ));
+
+                repository.save(new Cake(
+                        null,
+                        "Strawberry Shortcake",
+                        "Light strawberry sponge layered cake",
+                        "Dessert",
+                        560.0,
+                        14,
+                        "https://example.com/strawberry.jpg"
+                ));
+
+                repository.save(new Cake(
+                        null,
+                        "Oreo Celebration",
+                        "Cream-filled Oreo style celebration cake",
+                        "Celebration",
+                        880.0,
+                        9,
+                        "https://example.com/oreo.jpg"
+                ));
+
+                repository.save(new Cake(
+                        null,
+                        "Classic Pineapple",
+                        "A fresh pineapple sponge cake",
+                        "Fruit",
+                        620.0,
+                        11,
+                        "https://example.com/pineapple.jpg"
+                ));
+
+                System.out.println("Inserted 10 sample cakes successfully.");
 
             } else {
                 System.out.println("Database already contains data. Skipping sample data.");
