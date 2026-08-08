@@ -1,19 +1,39 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> feature/order-service
 services:
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - cake-network
+
   mysql:
-    image: mysql:8.4
+    image: mysql:8.0
     container_name: cake-mysql
 
     environment:
       MYSQL_ROOT_PASSWORD: Sweetlife&15
-      MYSQL_DATABASE: cake_catalog
 
     ports:
       - "3307:3306"
 
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
 
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pSweetlife&15"]
@@ -41,6 +61,33 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cake_catalog
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+
+    networks:
+      - cake-network
+
+  order-service:
+    build:
+      context: ./order-service
+
+    container_name: order-service
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+    ports:
+      - "8082:8082"
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cake_order
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
 
     networks:
       - cake-network
