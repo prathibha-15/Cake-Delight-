@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cake-delight-config
+  namespace: cake-delight
+data:
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE_CATALOG: cake_catalog
+  MYSQL_DATABASE_ORDER: cake_order
+  MYSQL_DATABASE_RATING: cake_rating
+  MYSQL_DATABASE_NOTIFICATION: notification_db
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USERNAME: guest
+  SPRING_MAIL_HOST: mailhog
+  SPRING_MAIL_PORT: "1025"
+  NOTIFICATION_MAIL_ENABLED: "true"
+  NOTIFICATION_MAIL_FROM: no-reply@cakedelight.local
+  NOTIFICATION_MAIL_TO: demo@cakedelight.local
+  NOTIFICATION_MAIL_SUBJECT_PREFIX: "[Cake Delight]"
