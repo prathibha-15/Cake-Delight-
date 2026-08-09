@@ -66,4 +66,20 @@ public ResponseEntity<ErrorResponse> handleOrderNotFound(
 
     return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
 }
+
+    @ExceptionHandler(CakeNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCakeNotFound(
+            CakeNotFoundException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse error = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
 }
