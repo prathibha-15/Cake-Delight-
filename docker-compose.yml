@@ -155,6 +155,28 @@ services:
     networks:
       - cake-network
 
+  api-gateway:
+    build:
+      context: ./api-gateway
+
+    container_name: api-gateway
+
+    depends_on:
+      catalog-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      rating-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - cake-network
+
 volumes:
   mysql-data:
 
