@@ -11,6 +11,19 @@ public class RouteConfig {
     @Bean
     public RouteLocator routes(RouteLocatorBuilder builder) {
         return builder.routes()
+                .route("ui-root", r -> r.path("/")
+                        .filters(f -> f.setPath("/index.html"))
+                        .uri("forward:/"))
+                .route("ui-fallback", r -> r.path("/**")
+                        .and()
+                        .predicate(exchange -> {
+                            String path = exchange.getRequest().getURI().getPath();
+                            return !path.startsWith("/api/")
+                                    && !path.startsWith("/actuator/")
+                                    && !path.contains(".");
+                        })
+                        .filters(f -> f.setPath("/index.html"))
+                        .uri("forward:/"))
                 .route("catalog-root", r -> r.path("/api/catalog")
                         .filters(f -> f.rewritePath("/api/catalog", "/api/cakes"))
                         .uri("http://catalog-service:8081"))

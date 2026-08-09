@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cake Delight</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #fff8f2; color: #3b2b1f; }
+    header { background: #d96c2b; color: white; padding: 1rem 1.5rem; }
+    main { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; padding: 1rem; }
+    .card { background: white; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .product { border: 1px solid #f0e0d0; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    button { background: #d96c2b; color: white; border: none; border-radius: 6px; padding: 0.55rem 0.8rem; cursor: pointer; margin-top: 0.4rem; }
+    button.secondary { background: #6f4e37; }
+    input, select, textarea { width: 100%; padding: 0.5rem; margin-top: 0.3rem; margin-bottom: 0.6rem; box-sizing: border-box; }
+    ul { padding-left: 1rem; }
+    .muted { color: #7a5b42; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cake Delight</h1>
+    <p>Minimal storefront served by the gateway.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Catalog</h2>
+      <div id="catalog"></div>
+      <h3>Leave a rating</h3>
+      <form id="ratingForm">
+        <label> Cake ID <input id="ratingCakeId" type="number" required /></label>
+        <label> User ID <input id="ratingUserId" type="number" required /></label>
+        <label> Score <input id="ratingScore" type="number" min="1" max="5" required /></label>
+        <label> Comment <textarea id="ratingComment"></textarea></label>
+        <button type="submit">Submit rating</button>
+      </form>
+      <p id="ratingStatus" class="muted"></p>
+    </section>
+
+    <aside class="card">
+      <h2>Basket</h2>
+      <ul id="basket"></ul>
+      <button id="checkout" class="secondary">Checkout</button>
+      <p id="status" class="muted"></p>
+    </aside>
+  </main>
+
+  <script>
+    const catalogEl = document.getElementById("catalog");
+    const basketEl = document.getElementById("basket");
+    const statusEl = document.getElementById("status");
+    const ratingStatusEl = document.getElementById("ratingStatus");
+
+    async function loadCatalog() {
+      const res = await fetch("/api/catalog/cakes");
+      const cakes = await res.json();
+      catalogEl.innerHTML = cakes.map(cake => `
+        <div class="product">
+          <strong>${cake.name}</strong><br />
+          ${cake.description}<br />
+          $${cake.price} · ${cake.category}<br />
+          <button onclick="addToBasket(${cake.id})">Add to basket</button>
+        </div>
+      `).join("");
+    }
+
+    async function loadBasket() {
+      const res = await fetch("/api/basket");
+      if (!res.ok) {
+        basketEl.innerHTML = "<li>Your basket is empty.</li>";
+        return;
+      }
+      const basket = await res.json();
+      const items = basket.items || [];
+      basketEl.innerHTML = items.length ? items.map(item => `<li>${item.cakeName} × ${item.quantity}</li>`).join("") : "<li>Your basket is empty.</li>";
+    }
+
+    async function addToBasket(cakeId) {
+      const res = await fetch("/api/basket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cakeId, quantity: 1 })
+      });
+      if (res.ok) {
+        statusEl.textContent = "Added to basket";
+        loadBasket();
+      } else {
+        statusEl.textContent = "Could not add item";
+      }
+    }
+
+    async function checkout() {
+      const res = await fetch("/api/checkout", { method: "POST" });
+      if (res.ok) {
+        statusEl.textContent = "Checkout successful";
+        loadBasket();
+      } else {
+        statusEl.textContent = "Checkout failed";
+      }
+    }
+
+    document.getElementById("checkout").addEventListener("click", checkout);
+
+    document.getElementById("ratingForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const payload = {
+        cakeId: Number(document.getElementById("ratingCakeId").value),
+        userId: Number(document.getElementById("ratingUserId").value),
+        score: Number(document.getElementById("ratingScore").value),
+        comment: document.getElementById("ratingComment").value
+      };
+
+      const res = await fetch("/api/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        ratingStatusEl.textContent = "Rating submitted";
+      } else {
+        ratingStatusEl.textContent = "Rating submission failed";
+      }
+    });
+
+    window.addToBasket = addToBasket;
+    loadCatalog();
+    loadBasket();
+  </script>
+</body>
+</html>
