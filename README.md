@@ -4,6 +4,14 @@
 
 ---
 
+## 📦 Source Code & Repository
+
+- **GitHub Repository**: [https://github.com/prathibha-15/Cake-Delight-](https://github.com/prathibha-15/Cake-Delight-)
+
+The GitHub repository contains the complete project source code, microservice implementations, Docker Compose setup, Kubernetes manifests, and technical documentation.
+
+---
+
 ## 🏛️ Architecture & System Topology
 
 The platform consists of 5 core application microservices and 3 supporting infrastructure containers:
