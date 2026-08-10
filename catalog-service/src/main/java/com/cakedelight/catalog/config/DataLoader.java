@@ -28,7 +28,7 @@ public class DataLoader {
                         "Birthday",
                         799.0,
                         20,
-                        "https://example.com/chocolate.jpg"
+                        "https://kreamz.in/celebration-cake/chocolate-truffle-cake/"
                 ));
 
                 repository.save(new Cake(
@@ -38,7 +38,7 @@ public class DataLoader {
                         "Birthday",
                         699.0,
                         15,
-                        "https://example.com/blackforest.jpg"
+                        "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -48,7 +48,7 @@ public class DataLoader {
                         "Anniversary",
                         899.0,
                         12,
-                        "https://example.com/redvelvet.jpg"
+                        "https://images.unsplash.com/photo-1586985289906-406988f2fbe4?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -58,7 +58,7 @@ public class DataLoader {
                         "Birthday",
                         599.0,
                         18,
-                        "https://example.com/vanilla.jpg"
+                        "https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -68,7 +68,7 @@ public class DataLoader {
                         "Birthday",
                         749.0,
                         10,
-                        "https://example.com/butterscotch.jpg"
+                        "https://images.unsplash.com/photo-1576119191902-3e3ac6fe1f3e?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -78,7 +78,7 @@ public class DataLoader {
                         "Cheesecake",
                         650.0,
                         8,
-                        "https://example.com/blueberry.jpg"
+                        "https://images.unsplash.com/photo-1559620192-032c4bc4674e?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -88,7 +88,7 @@ public class DataLoader {
                         "Dessert",
                         560.0,
                         14,
-                        "https://example.com/strawberry.jpg"
+                        "https://images.unsplash.com/photo-1567529695817-3f7b4fbc5d0c?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -98,7 +98,7 @@ public class DataLoader {
                         "Celebration",
                         880.0,
                         9,
-                        "https://example.com/oreo.jpg"
+                        "https://images.unsplash.com/photo-1614707267537-7c4981f2f0f0?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -108,7 +108,7 @@ public class DataLoader {
                         "Fruit",
                         620.0,
                         11,
-                        "https://example.com/pineapple.jpg"
+                        "https://images.unsplash.com/photo-1571115177098-24ec42ed204d?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 repository.save(new Cake(
@@ -118,7 +118,7 @@ public class DataLoader {
                         "Celebration",
                         720.0,
                         13,
-                        "https://example.com/pistachio.jpg"
+                        "https://images.unsplash.com/photo-1562440499-64c9a111f713?auto=format&fit=crop&w=900&q=80"
                 ));
 
                 System.out.println("Inserted 10 sample cakes successfully.");

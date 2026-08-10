@@ -41,7 +41,21 @@ public class EmailNotificationSender implements NotificationSender {
                 + "Order Date: " + payload.getOrderDate() + "\n"
                 + "Total Amount: " + payload.getTotalAmount() + "\n"
                 + "Order Status: " + payload.getStatus() + "\n"
+                + "Delivery Status: " + resolveDeliveryStatus(payload.getStatus()) + "\n"
                 + "Channel: " + notification.getChannel() + "\n"
                 + "Status: " + notification.getStatus();
+    }
+
+    private String resolveDeliveryStatus(String orderStatus) {
+        if (orderStatus == null) {
+            return "Pending";
+        }
+
+        String normalized = orderStatus.trim().toUpperCase();
+        return switch (normalized) {
+            case "DELIVERED" -> "Delivered";
+            case "SHIPPED", "IN_TRANSIT", "PROCESSING", "CONFIRMED" -> "In transit";
+            default -> "Pending";
+        };
     }
 }

@@ -1,0 +1,128 @@
+{
+  "info": {
+    "name": "Cake Delight API Collection",
+    "description": "End-to-End Postman Collection for Cake Delight Microservices",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Catalog - Get All Cakes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/cakes",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "cakes"]
+        }
+      }
+    },
+    {
+      "name": "Catalog - Filter Cakes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/catalog/cakes?category=Birthday",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "catalog", "cakes"],
+          "query": [
+            { "key": "category", "value": "Birthday" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Order - Add to Basket",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cakeId\": 1,\n  \"quantity\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/basket",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "orders", "basket"]
+        }
+      }
+    },
+    {
+      "name": "Order - Get Basket",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/basket",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "orders", "basket"]
+        }
+      }
+    },
+    {
+      "name": "Order - Checkout",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/checkout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "orders", "checkout"]
+        }
+      }
+    },
+    {
+      "name": "Rating - Submit Rating",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cakeId\": 1,\n  \"userId\": 101,\n  \"score\": 5,\n  \"comment\": "Superb cake!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/ratings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "ratings"]
+        }
+      }
+    },
+    {
+      "name": "Rating - Get Average Rating",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/ratings/cakes/1/average",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "ratings", "cakes", "1", "average"]
+        }
+      }
+    },
+    {
+      "name": "Notification - Get Order Notifications",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications/orders/1",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications", "orders", "1"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ]
+}
