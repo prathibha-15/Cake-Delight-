@@ -4,12 +4,16 @@ import com.cakedelight.notification.config.NotificationMailProperties;
 import com.cakedelight.notification.dto.NotificationEmailPayload;
 import com.cakedelight.notification.entity.Notification;
 import com.cakedelight.notification.service.NotificationSender;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 @Service
 public class EmailNotificationSender implements NotificationSender {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailNotificationSender.class);
 
     private final JavaMailSender mailSender;
     private final NotificationMailProperties mailProperties;
@@ -22,15 +26,18 @@ public class EmailNotificationSender implements NotificationSender {
     @Override
     public void send(Notification notification, NotificationEmailPayload payload) {
         if (!mailProperties.isEnabled()) {
+            log.info("Email notification disabled by configuration for order ID: {}", payload.getOrderId());
             return;
         }
 
+        log.info("Dispatching email for order ID: {} to {}", payload.getOrderId(), mailProperties.getTo());
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(mailProperties.getFrom());
         message.setTo(mailProperties.getTo());
         message.setSubject(mailProperties.getSubjectPrefix() + " Order #" + payload.getOrderId() + " completed");
         message.setText(buildBody(notification, payload));
         mailSender.send(message);
+        log.info("Email sent successfully for order ID: {}", payload.getOrderId());
     }
 
     private String buildBody(Notification notification, NotificationEmailPayload payload) {

@@ -74,6 +74,24 @@ class NotificationServiceImplTest {
     }
 
     @Test
+    void handleOrderCompleted_FailedNotification_ShouldRetryEmailSend() {
+        Notification failedNotification = new Notification();
+        failedNotification.setId(2L);
+        failedNotification.setEventId(eventId);
+        failedNotification.setStatus(NotificationStatus.FAILED);
+
+        when(notificationRepository.findByEventId(eventId)).thenReturn(Optional.of(failedNotification));
+        when(notificationRepository.save(any(Notification.class))).thenReturn(sampleNotification);
+        doNothing().when(notificationSender).send(any(Notification.class), any(NotificationEmailPayload.class));
+        when(notificationMapper.toResponse(sampleNotification)).thenReturn(sampleResponse);
+
+        NotificationResponse response = notificationService.handleOrderCompleted(sampleEvent);
+
+        assertNotNull(response);
+        verify(notificationSender).send(any(Notification.class), any(NotificationEmailPayload.class));
+    }
+
+    @Test
     void handleOrderCompleted_NewNotification_ShouldSaveAndSendEmail() {
         when(notificationRepository.findByEventId(eventId)).thenReturn(Optional.empty());
         when(notificationRepository.save(any(Notification.class))).thenReturn(sampleNotification);

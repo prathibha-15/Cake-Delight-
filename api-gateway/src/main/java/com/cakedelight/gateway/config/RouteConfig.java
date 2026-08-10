@@ -43,7 +43,7 @@ public class RouteConfig {
                         .filters(f -> f.rewritePath("/api/orders/(?<remaining>.*)", "/api/orders/${remaining}"))
                         .uri("http://order-service:8082"))
                 .route("basket", r -> r.path("/api/basket/**")
-                        .filters(f -> f.rewritePath("/api/basket/(?<remaining>.*)", "/api/basket/${remaining}"))
+                        .filters(f -> f.rewritePath("/api/basket/(?<remaining>.*)", "/api/basket${remaining}"))
                         .uri("http://order-service:8082"))
                 .route("checkout", r -> r.path("/api/checkout")
                         .uri("http://order-service:8082"))

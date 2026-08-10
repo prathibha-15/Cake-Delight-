@@ -1,47 +1,66 @@
-# Order Completed Event Contract
+# 📩 Order Completed Event Contract & Schema Specification
 
-## Event name
+This document details the exact AMQP messaging event contract implemented in **Cake Delight** for asynchronous event propagation between `order-service` and `notification-service`.
 
-`OrderCompletedEvent`
+---
 
-## Routing
+## 1. Event Overview
 
-- Exchange: `order.events.exchange`
-- Queue: `order.completed.queue`
-- Routing key: `order.completed`
+- **Event Name**: `OrderCompletedEvent`
+- **Producer**: `order-service` (`com.cakedelight.order.service.OrderServiceImpl`)
+- **Consumer**: `notification-service` (`com.cakedelight.notification.listener.OrderCompletedListener`)
+- **Messaging Protocol**: AMQP 0-9-1 over RabbitMQ
+- **Payload Format**: JSON (`application/json`)
 
-## JSON payload
+---
+
+## 2. RabbitMQ Routing Specification
+
+| Attribute | Configured Value |
+| :--- | :--- |
+| **Exchange Name** | `order.events.exchange` |
+| **Exchange Type** | Topic Exchange (`TopicExchange`) |
+| **Routing Key** | `order.completed` |
+| **Queue Name** | `order.completed.queue` |
+| **Durability** | Durable |
+
+---
+
+## 3. JSON Payload Schema
 
 ```json
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440000",
-  "orderId": 101,
-  "orderDate": "2026-08-08T12:30:00",
-  "totalAmount": 499.0,
+  "orderId": 1,
+  "orderDate": "2026-08-10T13:53:31.366033661",
+  "totalAmount": 1598.0,
   "status": "CREATED"
 }
 ```
 
-## Field meanings
+### Field Definitions
 
-- `eventId`: Stable UUID for idempotency and duplicate detection.
-- `orderId`: Order identifier produced by order-service.
-- `orderDate`: Timestamp of the completed order in ISO-8601 local date-time format.
-- `totalAmount`: Final order amount.
-- `status`: Order status string emitted by order-service.
+| Field Name | Type | Description |
+| :--- | :--- | :--- |
+| `eventId` | `String` (UUID) | Unique message identifier generated at broadcast time to support consumer-side idempotency. |
+| `orderId` | `Long` | Primary key identifier of the placed order in `cake_order.orders`. |
+| `orderDate` | `LocalDateTime` / ISO-8601 | Timestamp indicating when the order checkout occurred. |
+| `totalAmount` | `Double` | Total purchase amount for the checkout in standard currency units. |
+| `status` | `String` | Order processing status (e.g. `CREATED`). |
 
-## Consumer expectations
+---
 
-- Notification Service must ignore duplicate `eventId` values.
-- Notification Service persists one notification row per unique event.
-- The consumer treats the payload as the source of truth for the email body.
+## 4. Lifecycle & Processing Workflow
 
-## Compatibility notes
+### A. Producer Trigger (`order-service`)
+1. User invokes `POST /api/orders/checkout`.
+2. `order-service` creates an `Order` entity, calculates total cost from `BasketItem` entities, saves `orders` & `order_items` in MySQL database `cake_order`, and flushes the basket.
+3. Upon database commit, `order-service` instantiates `OrderCompletedEvent` with a new `UUID.randomUUID()`.
+4. `RabbitTemplate` serializes the payload to JSON and sends it to `order.events.exchange` with routing key `order.completed`.
 
-- `eventId` must stay present for idempotency.
-- `status` should remain a stable string value.
-- If the payload grows later, new fields should be added without breaking existing consumers.
-
-## Local notification delivery
-
-The notification branch uses Spring Mail and a local SMTP sink during development so the send path is still exercised without requiring a production mailbox. Swap the `SPRING_MAIL_*` environment variables to Mailtrap, Gmail app password, or another SMTP provider when you want external delivery.
+### B. Consumer Processing (`notification-service`)
+1. `OrderCompletedListener` receives the payload from `order.completed.queue`.
+2. `NotificationServiceImpl` verifies whether a notification record for `orderId` already exists (preventing duplicate email sends).
+3. A new `Notification` entity is created in `notification_db.notifications` with status `PENDING`.
+4. `EmailNotificationSender` formats an HTML order confirmation email containing the order details and sends it via SMTP to MailHog (`localhost:1025`).
+5. On successful delivery, the notification status in MySQL is updated to `SENT`.

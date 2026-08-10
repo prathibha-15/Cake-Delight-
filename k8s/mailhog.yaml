@@ -25,6 +25,17 @@ spec:
           args:
             - -smtp-bind-addr=0.0.0.0:1025
             - -ui-bind-addr=0.0.0.0:8025
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8025
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 1025
+            initialDelaySeconds: 10
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service

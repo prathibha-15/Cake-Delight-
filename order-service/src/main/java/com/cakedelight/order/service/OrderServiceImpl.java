@@ -14,6 +14,8 @@ import com.cakedelight.order.repository.BasketItemRepository;
 import com.cakedelight.order.repository.OrderItemRepository;
 import com.cakedelight.order.repository.OrderRepository;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -23,6 +25,8 @@ import java.util.UUID;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     private final BasketItemRepository basketRepository;
     private final OrderRepository orderRepository;
@@ -81,6 +85,8 @@ public class OrderServiceImpl implements OrderService {
 
         orderItemRepository.saveAll(orderItems);
 
+        log.info("Created order ID: {} with total amount: {}", savedOrder.getId(), savedOrder.getTotalAmount());
+
         OrderCompletedEvent orderCompletedEvent = new OrderCompletedEvent(
                 UUID.randomUUID(),
                 savedOrder.getId(),
@@ -90,6 +96,7 @@ public class OrderServiceImpl implements OrderService {
         );
 
         orderEventPublisher.publish(orderCompletedEvent);
+        log.info("Published OrderCompletedEvent for order ID: {}", savedOrder.getId());
 
         basketRepository.deleteAll();
 
