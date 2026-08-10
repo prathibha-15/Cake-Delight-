@@ -6,7 +6,7 @@ This document details the architectural topology, service communication patterns
 
 ## 1. Overall System Architecture
 
-Cake Delight is constructed following an **event-driven microservices architecture** pattern. All client requests (Web Storefront UI, Mobile API clients) enter the platform through a unified **API Gateway**, which routes HTTP traffic to downstream business microservices. Asynchronous operations, such as order completion and email dispatch, are handled via **RabbitMQ** event messaging.
+Cake Delight is constructed following an **event-driven microservices architecture** pattern. All client requests (Web Storefront UI) enter the platform through a unified **API Gateway**, which routes HTTP traffic to downstream business microservices. Asynchronous operations, such as order completion and email dispatch, are handled via **RabbitMQ** event messaging.
 
 ```mermaid
 flowchart TD
@@ -163,12 +163,13 @@ erDiagram
 
     NOTIFICATIONS {
         bigint id PK
+        uuid event_id UK
         bigint order_id
-        varchar recipient
-        varchar subject
-        text content
+        varchar channel
         varchar status
+        datetime sent_at
         datetime created_at
+        datetime updated_at
     }
 
     ORDERS ||--|{ ORDER_ITEMS : contains
