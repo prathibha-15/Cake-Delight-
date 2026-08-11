@@ -10,29 +10,29 @@ Cake Delight is constructed following an **event-driven microservices architectu
 
 ```mermaid
 flowchart TD
-    Client["💻 Web Storefront / Client (Browser)"] -->|HTTP / REST (Port 8080)| Gateway["🌐 API Gateway (Spring Cloud Gateway)"]
+    Client["Web Storefront / Client (Browser)"] -->|HTTP / REST (Port 8080)| Gateway["API Gateway (Spring Cloud Gateway)"]
 
     subgraph Business Microservices
-        Gateway -->|/api/catalog/**| Catalog["🍰 Catalog Service (Port 8081)"]
-        Gateway -->|/api/orders/**| Order["🛒 Order Service (Port 8082)"]
-        Gateway -->|/api/ratings/**| Rating["⭐ Rating Service (Port 8083)"]
-        Gateway -->|/api/notifications/**| Notification["🔔 Notification Service (Port 8084)"]
+        Gateway -->|/api/catalog/**| Catalog["Catalog Service (Port 8081)"]
+        Gateway -->|/api/orders/**| Order["Order Service (Port 8082)"]
+        Gateway -->|/api/ratings/**| Rating["Rating Service (Port 8083)"]
+        Gateway -->|/api/notifications/**| Notification["Notification Service (Port 8084)"]
     end
 
     subgraph Data Tier
-        Catalog -->|JDBC| MySQL[("🗄️ MySQL 8.0 (Port 3307:3306)\n- cake_catalog\n- cake_order\n- cake_rating\n- notification_db")]
+        Catalog -->|JDBC| MySQL[("MySQL 8.0 (Host: 3307, K8s: 3306)<br/>- cake_catalog<br/>- cake_order<br/>- cake_rating<br/>- notification_db")]
         Order -->|JDBC| MySQL
         Rating -->|JDBC| MySQL
         Notification -->|JDBC| MySQL
     end
 
     subgraph Event & Messaging Infrastructure
-        Order -->|Publish OrderCompletedEvent| RabbitMQ["🐇 RabbitMQ (Port 5672 / 15672)\nExchange: order.events.exchange"]
+        Order -->|Publish OrderCompletedEvent| RabbitMQ["RabbitMQ (Port 5672 AMQP / 15672 UI)<br/>Exchange: order.events.exchange"]
         RabbitMQ -->|Consume order.completed.queue| Notification
     end
 
     subgraph Email Delivery Sink
-        Notification -->|SMTP (Port 1025)| MailHog["📬 MailHog (Port 8025 Web UI)"]
+        Notification -->|SMTP (Port 1025)| MailHog["MailHog (Port 8025 Web UI)"]
     end
 ```
 
@@ -40,16 +40,16 @@ flowchart TD
 
 ## 2. Component Topology & Responsibilities
 
-| Service | Port | Database | Primary Responsibility |
+| Service | Host / K8s Port | Database | Primary Responsibility |
 | :--- | :--- | :--- | :--- |
-| **API Gateway** | `8080` | None | Unified reverse-proxy entry point, request path routing, static UI hosting. |
+| **API Gateway** | `8080` (NodePort `30080`) | None | Unified reverse-proxy entry point, request path routing, static UI hosting. |
 | **Catalog Service** | `8081` | `cake_catalog` | Manages cake catalog items, pricing, inventory stock, and filtering by category/name/price. |
 | **Order Service** | `8082` | `cake_order` | Manages shopping basket items, checkout processing, order records, and AMQP event publishing. |
-| **Rating Service** | `8083` | `cake_rating` | Manages customer cake ratings, review comments, and calculates aggregate average scores. |
+| **Rating Service** | `8083` | `cake_rating` | Independent service managing customer cake reviews and aggregate average scores. |
 | **Notification Service** | `8084` | `notification_db` | Consumes RabbitMQ order events, records notification audit logs, and sends emails via MailHog. |
-| **MySQL** | `3307` | Shared Instance | Relational storage hosting 4 isolated databases (`cake_catalog`, `cake_order`, `cake_rating`, `notification_db`). |
-| **RabbitMQ** | `5672`, `15672` | In-Memory / Disk | Asynchronous message broker handling topic exchanges and durable queues. |
-| **MailHog** | `1025`, `8025` | In-Memory | Local SMTP sink for receiving, inspecting, and debugging notification emails. |
+| **MySQL** | Docker: `3307:3306`<br/>K8s: `3306` | Shared Instance | Relational storage hosting 4 isolated databases (`cake_catalog`, `cake_order`, `cake_rating`, `notification_db`). |
+| **RabbitMQ** | `5672` (AMQP)<br/>`15672` (Web UI) | In-Memory / Disk | Asynchronous message broker handling topic exchanges (`order.events.exchange`) and durable queues (`order.completed.queue`). |
+| **MailHog** | `1025` (SMTP)<br/>`8025` (Web UI) | In-Memory | Local SMTP sink for receiving, inspecting, and debugging notification emails. |
 
 ---
 
@@ -72,7 +72,11 @@ flowchart TD
 - **Queue**: `order.completed.queue`
 - **Consumer**: `notification-service` (`OrderCompletedListener`)
 
-When checkout is executed, `order-service` saves the order state to `cake_order.orders`, clears the basket, and broadcasts `OrderCompletedEvent` to RabbitMQ. `notification-service` consumes the payload asynchronously without blocking the checkout HTTP response.
+When checkout is executed, `order-service` saves the order state to `cake_order.orders`, clears the basket, and broadcasts `OrderCompletedEvent` to RabbitMQ. `notification-service` consumes the payload asynchronously from `order.completed.queue` without blocking the checkout HTTP response.
+
+### C. Rating Service Independence
+- `rating-service` manages cake reviews and average ratings independently on its own database `cake_rating`.
+- There is no direct HTTP, Feign client, or database coupling between `catalog-service` and `rating-service`. Frontend clients fetch catalog details from `catalog-service` and rating summary data from `rating-service` via API Gateway.
 
 ---
 
@@ -81,13 +85,13 @@ When checkout is executed, `order-service` saves the order state to `cake_order.
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Customer as 👤 Customer / Browser
-    participant Gateway as 🌐 API Gateway (8080)
-    participant Catalog as 🍰 Catalog Service (8081)
-    participant Order as 🛒 Order Service (8082)
-    participant Rabbit as 🐇 RabbitMQ Broker
-    participant Notif as 🔔 Notification Service (8084)
-    participant Mail as 📬 MailHog (8025)
+    actor Customer as Customer / Browser
+    participant Gateway as API Gateway (8080)
+    participant Catalog as Catalog Service (8081)
+    participant Order as Order Service (8082)
+    participant Rabbit as RabbitMQ Broker (5672)
+    participant Notif as Notification Service (8084)
+    participant Mail as MailHog (8025 / 1025)
 
     Customer->>Gateway: GET /api/catalog/cakes
     Gateway->>Catalog: Forward request to /api/cakes
@@ -100,12 +104,12 @@ sequenceDiagram
     Customer->>Gateway: POST /api/orders/checkout
     Gateway->>Order: Forward to /api/checkout
     Order->>Order: Persist Order & Clear Basket
-    Order->>Rabbit: Publish OrderCompletedEvent to order.events.exchange
+    Order->>Rabbit: Publish OrderCompletedEvent to order.events.exchange (Routing Key: order.completed)
     Order-->>Customer: Return CheckoutResponse (Order Placed)
 
     Rabbit->>Notif: Deliver message from order.completed.queue
-    Notif->>Notif: Save notification record (PENDING -> SENT)
-    Notif->>Mail: Send SMTP Email to MailHog (Port 1025)
+    Notif->>Notif: Save notification record in notification_db
+    Notif->>Mail: Send SMTP Email (Port 1025)
     Mail-->>Customer: View email in MailHog Web UI (Port 8025)
 ```
 
@@ -181,9 +185,12 @@ erDiagram
 
 ### Docker Compose View
 All 8 containers run within a single isolated bridge network `cake-network`. Service discovery relies on Docker container names (`catalog-service`, `order-service`, `rating-service`, `notification-service`, `cake-mysql`, `rabbitmq`, `mailhog`).
+- **MySQL Host Port Mapping**: `3307:3306`
+- **RabbitMQ Host Port Mappings**: AMQP `5672:5672`, Management UI `15672:15672`
+- **MailHog Host Port Mappings**: SMTP `1025:1025`, Web UI `8025:8025`
 
 ### Kubernetes View
 Deployed in namespace `cake-delight`:
-- **API Gateway**: Deployed with `NodePort` mapping `30080:8080`.
-- **Microservices & Infrastructure**: Deployed as individual `Deployment` resources paired with `ClusterIP` `Service` definitions.
-- **Config & Secrets**: Managed globally via `cake-delight-config` ConfigMap and `cake-delight-secret` Secret.
+- **API Gateway**: Deployed as a `NodePort` service mapping node port `30080` to target port `8080`.
+- **Microservices & Infrastructure**: Deployed as individual `Deployment` resources paired with `ClusterIP` `Service` definitions (`mysql:3306`, `rabbitmq:5672`, `mailhog:1025/8025`).
+- **Config & Secrets**: Managed globally via `cake-delight-config` ConfigMap and `cake-delight-secrets` Secret.
