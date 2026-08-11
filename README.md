@@ -108,8 +108,8 @@ All client API requests should be routed through the **API Gateway** on port `80
 - `POST http://localhost:8080/api/orders/basket` - Add cake to basket (`{"cakeId": 1, "quantity": 2}`).
 - `PUT http://localhost:8080/api/orders/basket/{itemId}` - Update quantity of basket item.
 - `DELETE http://localhost:8080/api/orders/basket/{itemId}` - Remove item from basket.
-- `POST http://localhost:8080/api/orders/checkout` - Checkout basket and place an order.
-- `GET http://localhost:8080/api/orders/orders/{id}` - Get order status by order ID.
+- `POST http://localhost:8080/api/orders/checkout` - Checkout active basket and place an order.
+- `GET http://localhost:8080/api/orders/{id}` - Get order status by order ID.
 
 ### ⭐ Rating API
 - `POST http://localhost:8080/api/ratings` - Submit a cake review (`{"cakeId": 1, "userId": 101, "score": 5, "comment": "Delicious!"}`).
@@ -146,6 +146,7 @@ All client API requests should be routed through the **API Gateway** on port `80
 
 ### 2. Checkout Basket
 **Endpoint:** `POST http://localhost:8080/api/orders/checkout`  
+*(Note: No JSON request body is required; the checkout endpoint processes all items currently in the active basket.)*  
 **Response (`201 Created`):**
 ```json
 {
@@ -215,7 +216,7 @@ An automated Postman collection is included in the codebase:
 
 1. Execute a checkout via the web UI at `http://localhost:8080` or via `POST /api/orders/checkout`.
 2. `order-service` publishes an `OrderCompletedEvent` to RabbitMQ exchange `order.events.exchange`.
-3. `notification-service` consumes the message from `order.completed.queue`, records the email in `notification_db.notifications`, and transmits an HTML email via SMTP to MailHog.
+3. `notification-service` consumes the message from `order.completed.queue`, records the email in `notification_db.notifications`, and transmits a plain-text email via SMTP to MailHog.
 4. Open **MailHog Web UI** at **[http://localhost:8025](http://localhost:8025)** to inspect the received order confirmation email.
 
 ---
@@ -369,11 +370,11 @@ Follow these steps to perform end-to-end verification of the deployed stack:
 1. **Open API Gateway**: Navigate to `http://localhost:8080` in your browser.
 2. **Fetch Catalog Cakes**: Send `GET http://localhost:8080/api/catalog/cakes` to verify items are returned from MySQL.
 3. **Add Cake to Basket**: Send `POST http://localhost:8080/api/orders/basket` (`{"cakeId": 1, "quantity": 2}`).
-4. **Checkout Order**: Send `POST http://localhost:8080/api/orders/checkout` (`{"customerName": "Tester", "customerEmail": "demo@cakedelight.local", "shippingAddress": "123 Main St"}`).
+4. **Checkout Order**: Send `POST http://localhost:8080/api/orders/checkout` (no request body required; processes current basket).
 5. **Verify Order Created**: Confirm HTTP 201 response containing `"status": "CREATED"` and `orderId`.
-6. **Verify Order Service Event**: Inspect `order-service` logs to confirm `OrderCreatedEvent` was published to RabbitMQ exchange `order.events.exchange`.
-7. **Verify Notification Listener**: Inspect `notification-service` logs to confirm receipt of `OrderCreatedEvent` from queue `order.completed.queue`.
-8. **Verify Email Inbox**: Open MailHog UI at `http://localhost:8025` to view the order confirmation email (`Subject: [Cake Delight] Order #...`).
+6. **Verify Order Service Event**: Inspect `order-service` logs to confirm `OrderCompletedEvent` was published to RabbitMQ exchange `order.events.exchange`.
+7. **Verify Notification Listener**: Inspect `notification-service` logs to confirm receipt of `OrderCompletedEvent` from queue `order.completed.queue`.
+8. **Verify Email Inbox**: Open MailHog UI at `http://localhost:8025` to view the plain-text order confirmation email (`Subject: [Cake Delight] Order #...`).
 
 ---
 

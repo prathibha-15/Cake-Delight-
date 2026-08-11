@@ -62,5 +62,5 @@ This document details the exact AMQP messaging event contract implemented in **C
 1. `OrderCompletedListener` receives the payload from `order.completed.queue`.
 2. `NotificationServiceImpl` checks `findByEventId(event.getEventId())`. If an existing record with status `SENT` is found, it returns the existing response immediately to maintain idempotency without re-sending the email.
 3. If an existing record has status `FAILED` or `PENDING` (from a previous failed attempt), or if it is a new event, `NotificationServiceImpl` sets/resets the status to `PENDING` and attempts email delivery.
-4. `EmailNotificationSender` formats an HTML order confirmation email containing the order details and sends it via SMTP to MailHog (`localhost:1025`).
+4. `EmailNotificationSender` formats a plain-text order confirmation email containing the order details and sends it via SMTP to MailHog (`localhost:1025`).
 5. On successful delivery, the notification status in MySQL is updated to `SENT`. If an exception occurs, status is set to `FAILED` and the exception is re-thrown for Spring AMQP retry handling.
