@@ -15,22 +15,34 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: docker.io/cake-delight/api-gateway:latest
+          image: cake-delight-api-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 120
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8080
-            initialDelaySeconds: 15
+            initialDelaySeconds: 0
             periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8080
-            initialDelaySeconds: 20
+            initialDelaySeconds: 0
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           env:
             - name: SERVER_PORT
               value: "8080"

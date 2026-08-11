@@ -107,6 +107,13 @@
       box-shadow: 0 8px 18px rgba(239, 27, 37, 0.12);
     }
 
+    .chip-remove {
+      margin-left: 6px;
+      font-weight: bold;
+      color: var(--brand);
+      padding: 0 2px;
+    }
+
     .layout {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 320px;
@@ -369,11 +376,11 @@
 <body>
   <header class="topbar">
     <div class="brand">Cake Delight</div>
-    <div class="topbar-note">Fresh cakes, live cart totals, and real ratings</div>
+    <div class="topbar-note">Fresh cakes, live basket totals, and real ratings</div>
   </header>
 
   <div class="hero">
-    <h2>Online Cake Delivery In Chennai</h2>
+    <h2>A Cake a Day Makes a Day</h2>
   </div>
 
   <div class="page">
@@ -403,7 +410,7 @@
       </section>
 
       <aside class="sidebar">
-        <h3>Cart</h3>
+        <h3>Basket</h3>
         <div id="basketSummary" class="muted"></div>
         <div id="basket"></div>
         <button id="checkout" class="primary" style="width:100%; margin-top: 12px;">Checkout</button>
@@ -467,6 +474,7 @@
     const ratingsModalListEl = document.getElementById("ratingsModalList");
 
     let activeCategory = "";
+    let allCategoriesSet = new Set();
     let currentBasket = { items: [], totalAmount: 0 };
     let currentModalCakeId = null;
     let lastCatalog = [];
@@ -535,17 +543,30 @@
       }, [[], []]);
     }
 
-    function renderCategoryChips(categories) {
-      const uniqueCategories = ["All", ...categories];
-      categoryChipsEl.innerHTML = uniqueCategories.map((category) => {
-        const categoryValue = category === "All" ? "" : category;
-        const activeClass = (activeCategory === categoryValue) ? "active-chip" : "";
-        return `<button class="filter-chip ${activeClass}" data-category="${categoryValue}">${category}</button>`;
+    function renderCategoryChips() {
+      const sortedCategories = Array.from(allCategoriesSet).sort();
+      const allActive = !activeCategory;
+      let html = `<button class="filter-chip ${allActive ? 'active-chip' : ''}" data-category="">All</button>`;
+
+      html += sortedCategories.map((category) => {
+        const isSelected = (activeCategory === category);
+        const activeClass = isSelected ? "active-chip" : "";
+        const removeBtn = isSelected ? ` <span class="chip-remove" data-remove="true">×</span>` : "";
+        return `<button class="filter-chip ${activeClass}" data-category="${category}">${category}${removeBtn}</button>`;
       }).join("");
 
+      categoryChipsEl.innerHTML = html;
+
       categoryChipsEl.querySelectorAll(".filter-chip").forEach((button) => {
-        button.addEventListener("click", async () => {
-          activeCategory = button.dataset.category || "";
+        button.addEventListener("click", async (e) => {
+          const categoryValue = button.dataset.category || "";
+          const isRemoveClick = e.target.classList.contains("chip-remove") || e.target.dataset.remove === "true";
+
+          if (isRemoveClick || (activeCategory === categoryValue && categoryValue !== "")) {
+            activeCategory = "";
+          } else {
+            activeCategory = categoryValue;
+          }
           await fetchAndRenderCatalog();
         });
       });
@@ -605,8 +626,10 @@
       }
 
       lastCatalog = Array.isArray(response.data) ? response.data : [];
-      const categories = [...new Set(lastCatalog.map((cake) => cake.category).filter(Boolean))].sort();
-      renderCategoryChips(categories);
+      lastCatalog.forEach((cake) => {
+        if (cake.category) allCategoriesSet.add(cake.category);
+      });
+      renderCategoryChips();
       renderCatalog(lastCatalog);
       await Promise.all(lastCatalog.map((cake) => refreshCakeAverage(cake.id)));
     }

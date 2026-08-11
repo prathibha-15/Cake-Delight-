@@ -41,16 +41,15 @@ public class EmailNotificationSender implements NotificationSender {
     }
 
     private String buildBody(Notification notification, NotificationEmailPayload payload) {
-        return "Order completed notification\n\n"
-                + "Notification ID: " + notification.getId() + "\n"
-                + "Event ID: " + payload.getEventId() + "\n"
-                + "Order ID: " + payload.getOrderId() + "\n"
-                + "Order Date: " + payload.getOrderDate() + "\n"
-                + "Total Amount: " + payload.getTotalAmount() + "\n"
-                + "Order Status: " + payload.getStatus() + "\n"
-                + "Delivery Status: " + resolveDeliveryStatus(payload.getStatus()) + "\n"
-                + "Channel: " + notification.getChannel() + "\n"
-                + "Status: " + notification.getStatus();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Cake Delight - Order Confirmation\n\n");
+        sb.append("Thank you for your order!\n\n");
+        sb.append("Order #").append(payload.getOrderId()).append("\n");
+        sb.append("Order Date: ").append(payload.getOrderDate()).append("\n\n");
+        sb.append("Total Amount: \u20B9").append(payload.getTotalAmount()).append("\n");
+        sb.append("Order Status: ").append(payload.getStatus()).append("\n\n");
+        sb.append("Thank you for choosing Cake Delight!");
+        return sb.toString();
     }
 
     private String resolveDeliveryStatus(String orderStatus) {

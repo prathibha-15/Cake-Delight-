@@ -222,42 +222,167 @@ An automated Postman collection is included in the codebase:
 
 ## ☸️ Kubernetes Deployment Guide (`k8s/`)
 
-Deploy the stack to a local Kubernetes cluster (e.g. Minikube):
-
-### 1. Apply Manifests
-Deploy all secrets, configmaps, persistent volumes, deployments, and services under namespace `cake-delight`:
-
-```bash
-kubectl apply -f k8s/
-```
-
-### 2. Verify Pod Status
-Check that all pods in namespace `cake-delight` achieve `1/1 Running`:
-
-```bash
-kubectl get pods -n cake-delight
-```
-
-### 3. Expose & Access Services
-The API Gateway is configured as a `NodePort` service mapping port `8080` to node port `30080`.
-
-- **Access via Minikube Service URL:**
-  ```bash
-  minikube service api-gateway -n cake-delight
-  ```
-- **Access via Port Forwarding:**
-  ```bash
-  kubectl port-forward svc/api-gateway 8080:8080 -n cake-delight
-  ```
+This section provides complete step-by-step instructions for deploying and verifying the **Cake Delight** microservices stack on a local **Minikube** Kubernetes cluster from a clean environment.
 
 ---
 
-## 🛠️ Troubleshooting Common Startup Issues
+### 📋 Kubernetes Prerequisites
 
-| Symptom | Cause | Resolution |
+Before beginning, ensure your local system has the following software installed:
+
+- **Docker Desktop** (must be installed and **RUNNING** before starting Minikube, as Minikube uses the Docker container driver).
+- **Minikube** (v1.30+).
+- **kubectl** (Kubernetes command-line interface).
+- **Windows PowerShell** (or bash for Linux/macOS).
+- **Sufficient System Resources**: Allocate at least **4 CPUs** and **8 GB RAM** to Docker Desktop / Minikube to run all 8 containers smoothly.
+
+> [!IMPORTANT]
+> - You **do NOT need to manually install or start MySQL, RabbitMQ, or MailHog** on your host machine. Kubernetes manifests deploy MySQL, RabbitMQ, MailHog, and all five microservices automatically into the cluster.
+> - You **do NOT need to manually build Maven JAR files** on your host machine before deployment. Multi-stage Docker builds inside Minikube compile and package the services automatically.
+> - Running `minikube start` initializes the Kubernetes cluster environment only. Running `kubectl apply -k k8s/` deploys the actual Cake Delight application stack into the cluster.
+
+---
+
+### ⚡ Complete Deployment Sequence (Windows PowerShell)
+
+Follow this exact sequence in Windows PowerShell to build and deploy the complete system:
+
+#### Step 1: Start Docker Desktop
+Ensure Docker Desktop is open and running on your host machine.
+
+#### Step 2: Start Minikube Cluster
+Launch Minikube using the default Docker driver:
+
+```powershell
+minikube start
+```
+
+#### Step 3: Configure PowerShell Session to use Minikube's Docker Daemon
+Direct your current PowerShell session to build Docker images inside Minikube's internal Docker daemon:
+
+```powershell
+& minikube -p minikube docker-env --shell powershell | Invoke-Expression
+```
+
+> [!NOTE]
+> This command must be executed in the active PowerShell terminal where you run the image build commands.
+
+#### Step 4: Build Application Docker Images
+Build all five microservice Docker images directly inside Minikube's environment:
+
+```powershell
+docker build -t cake-delight-api-gateway:latest ./api-gateway
+docker build -t cake-delight-catalog-service:latest ./catalog-service
+docker build -t cake-delight-order-service:latest ./order-service
+docker build -t cake-delight-rating-service:latest ./rating-service
+docker build -t cake-delight-notification-service:latest ./notification-service
+```
+
+#### Step 5: Verify Built Images
+Confirm that all 5 application images exist inside Minikube's Docker daemon:
+
+```powershell
+docker images | Select-String "cake-delight"
+```
+
+#### Step 6: Deploy Complete Kubernetes Stack
+Apply all secrets, configmaps, persistent volume claims, deployments, and services using Kustomize:
+
+```powershell
+kubectl apply -k k8s/
+```
+
+#### Step 7: Monitor Deployment & Check Pod Status
+Check the status of all pods in namespace `cake-delight`:
+
+```powershell
+kubectl get pods -n cake-delight
+```
+
+**Expected Pod List (8 Pods Total):**
+- `api-gateway`
+- `catalog-service`
+- `order-service`
+- `rating-service`
+- `notification-service`
+- `mysql`
+- `rabbitmq`
+- `mailhog`
+
+Wait until all 8 pods transition to **`1/1 Running`** with **`RESTARTS = 0`** (Spring Boot startup and initial database pool setup takes ~1–3 minutes).
+
+To inspect cluster service definitions, internal IPs, and target port mappings:
+
+```powershell
+kubectl get services -n cake-delight
+```
+
+---
+
+### 🌐 Accessing the Application
+
+Kubernetes ClusterIP services are internal to the Minikube cluster. To interact with the storefront, APIs, and Web UIs from your host browser or Postman, use `kubectl port-forward`.
+
+> [!NOTE]
+> Port-forwarding commands do **NOT** start the services. Kubernetes starts the containers when `kubectl apply -k k8s/` is executed. Port-forwarding simply bridges an already-running Kubernetes service/deployment to `localhost`.
+
+1. **Access API Gateway & Storefront UI** (`http://localhost:8080`):
+   ```powershell
+   kubectl port-forward deployment/api-gateway 8080:8080 -n cake-delight
+   ```
+2. **Access MailHog Web Inbox** (`http://localhost:8025`):
+   ```powershell
+   kubectl port-forward service/mailhog 8025:8025 -n cake-delight
+   ```
+3. **Access RabbitMQ Management Dashboard** (`http://localhost:15672` - Credentials: `guest` / `guest`):
+   ```powershell
+   kubectl port-forward service/rabbitmq 15672:15672 -n cake-delight
+   ```
+
+---
+
+### 🔍 Verification & Functional End-to-End Testing
+
+#### 1. Cluster Status & Log Inspection Commands
+Run the following commands to check pod health and trace the asynchronous event-driven workflow:
+
+```powershell
+# Verify all pods are Ready 1/1
+kubectl get pods -n cake-delight
+
+# View cluster service ports
+kubectl get services -n cake-delight
+
+# Inspect Order Service logs
+kubectl logs deployment/order-service -n cake-delight --tail=50
+
+# Inspect Notification Service logs (verify RabbitMQ event consumption)
+kubectl logs deployment/notification-service -n cake-delight --tail=50
+
+# Inspect RabbitMQ Broker logs
+kubectl logs deployment/rabbitmq -n cake-delight --tail=30
+```
+
+#### 2. Functional Verification Workflow
+Follow these steps to perform end-to-end verification of the deployed stack:
+
+1. **Open API Gateway**: Navigate to `http://localhost:8080` in your browser.
+2. **Fetch Catalog Cakes**: Send `GET http://localhost:8080/api/catalog/cakes` to verify items are returned from MySQL.
+3. **Add Cake to Basket**: Send `POST http://localhost:8080/api/orders/basket` (`{"cakeId": 1, "quantity": 2}`).
+4. **Checkout Order**: Send `POST http://localhost:8080/api/orders/checkout` (`{"customerName": "Tester", "customerEmail": "demo@cakedelight.local", "shippingAddress": "123 Main St"}`).
+5. **Verify Order Created**: Confirm HTTP 201 response containing `"status": "CREATED"` and `orderId`.
+6. **Verify Order Service Event**: Inspect `order-service` logs to confirm `OrderCreatedEvent` was published to RabbitMQ exchange `order.events.exchange`.
+7. **Verify Notification Listener**: Inspect `notification-service` logs to confirm receipt of `OrderCreatedEvent` from queue `order.completed.queue`.
+8. **Verify Email Inbox**: Open MailHog UI at `http://localhost:8025` to view the order confirmation email (`Subject: [Cake Delight] Order #...`).
+
+---
+
+### 🛠️ Troubleshooting Common Kubernetes Issues
+
+| Symptom | Probable Cause | Exact Resolution |
 | :--- | :--- | :--- |
-| `Port 8080/8081/3307 already in use` | Another process is bound to the port. | Stop existing processes or run `docker-compose down`. |
-| `MySQL connection refused` on microservice startup | MySQL is still initializing databases. | Wait 15 seconds; Docker Compose healthchecks will restart dependent services automatically. |
-| `RabbitMQ connection refused` | Broker container not ready yet. | Check `docker logs rabbitmq` to ensure management plugin is active. |
-| `404 Not Found` on `/api/...` endpoints | Incorrect gateway path or port. | Ensure requests are sent to API Gateway port `8080`. |
-| MailHog inbox empty after checkout | Notification service disabled or RabbitMQ host mismatch. | Check `docker logs notification-service` to confirm event consumption. |
+| `minikube start` fails | Docker Desktop is not running or responsive. | Start Docker Desktop, wait for it to report "Engine running", then re-run `minikube start`. |
+| `ImagePullBackOff` or `ErrImagePull` on application pods | Images were built on the host Docker daemon rather than inside Minikube's Docker environment. | Run `& minikube -p minikube docker-env --shell powershell \| Invoke-Expression` in your terminal, then rebuild all 5 docker images using `docker build -t cake-delight-<service>:latest ./<service>`. |
+| Pods show `0/1 Running` or restart during initial startup | Spring Boot JPA & MySQL database pool initialization is warming up. | Kubernetes `startupProbe` provides up to 10 minutes for JVM startup. Wait 1–2 minutes for startup probes to complete; pods will transition to `1/1 Running`. |
+| Browser shows `Connection Refused` on `http://localhost:8080` | Port-forwarding command has not been started in a terminal. | Run `kubectl port-forward deployment/api-gateway 8080:8080 -n cake-delight` in a separate terminal. |
+| MailHog inbox inaccessible at `http://localhost:8025` | Port-forwarding command has not been started for MailHog. | Run `kubectl port-forward service/mailhog 8025:8025 -n cake-delight` in a separate terminal. |

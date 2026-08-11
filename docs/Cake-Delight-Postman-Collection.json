@@ -112,9 +112,9 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/api/notifications/orders/1",
+          "raw": "{{baseUrl}}/api/notifications/1",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "notifications", "orders", "1"]
+          "path": ["api", "notifications", "1"]
         }
       }
     }
