@@ -43,34 +43,24 @@ For detailed architectural sequence flows and ER diagrams, see [docs/architectur
 - **Containerization**: Docker, Docker Compose, Kubernetes (Kustomize)
 
 ### Prerequisites
-- **Java 17 JDK** or higher
-- **Apache Maven 3.9+**
 - **Docker Desktop** (or Docker Engine + Docker Compose)
+- **Java 17 JDK** & **Apache Maven 3.9+** (optional, required only for standalone local development/testing)
 - **kubectl** & **Minikube** (optional, required only for Kubernetes deployment)
 
 ---
 
 ## 🚀 Quick Start Guide (Docker Compose - Recommended)
 
-### Step 1: Package Microservices
-Run Maven from the root directory to compile and build JAR artifacts for all microservices:
+All microservices use multi-stage Docker builds, so no local Maven installation or host compilation step is required.
 
-```bash
-cd catalog-service && mvn clean package -DskipTests && cd ..
-cd order-service && mvn clean package -DskipTests && cd ..
-cd api-gateway && mvn clean package -DskipTests && cd ..
-cd notification-service && mvn clean package -DskipTests && cd ..
-cd rating-service && mvn clean package -DskipTests && cd ..
-```
-
-### Step 2: Start All Infrastructure & Microservices
+### Step 1: Start All Infrastructure & Microservices
 Launch all containers in detached mode using Docker Compose:
 
 ```bash
 docker-compose up --build -d
 ```
 
-### Step 3: Verify Container Health
+### Step 2: Verify Container Health
 Check that all 8 containers are running and healthy:
 
 ```bash
