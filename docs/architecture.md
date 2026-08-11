@@ -10,29 +10,29 @@ Cake Delight is constructed following an **event-driven microservices architectu
 
 ```mermaid
 flowchart TD
-    Client["Web Storefront / Client (Browser)"] -->|HTTP / REST (Port 8080)| Gateway["API Gateway (Spring Cloud Gateway)"]
+    Client["Web Storefront / Browser"] -->|"HTTP / REST (Port 8080)"| Gateway["API Gateway (Port 8080)"]
 
-    subgraph Business Microservices
-        Gateway -->|/api/catalog/**| Catalog["Catalog Service (Port 8081)"]
-        Gateway -->|/api/orders/**| Order["Order Service (Port 8082)"]
-        Gateway -->|/api/ratings/**| Rating["Rating Service (Port 8083)"]
-        Gateway -->|/api/notifications/**| Notification["Notification Service (Port 8084)"]
+    subgraph Business_Microservices["Business Microservices"]
+        Gateway -->|"/api/catalog"| Catalog["Catalog Service (Port 8081)"]
+        Gateway -->|"/api/orders"| Order["Order Service (Port 8082)"]
+        Gateway -->|"/api/ratings"| Rating["Rating Service (Port 8083)"]
+        Gateway -->|"/api/notifications"| Notification["Notification Service (Port 8084)"]
     end
 
-    subgraph Data Tier
-        Catalog -->|JDBC| MySQL[("MySQL 8.0 (Host: 3307, K8s: 3306)<br/>- cake_catalog<br/>- cake_order<br/>- cake_rating<br/>- notification_db")]
-        Order -->|JDBC| MySQL
-        Rating -->|JDBC| MySQL
-        Notification -->|JDBC| MySQL
+    subgraph Data_Tier["Data Tier"]
+        Catalog -->|"JDBC"| MySQL["MySQL 8.0 (Host: 3307, K8s: 3306)<br/>Databases: cake_catalog, cake_order, cake_rating, notification_db"]
+        Order -->|"JDBC"| MySQL
+        Rating -->|"JDBC"| MySQL
+        Notification -->|"JDBC"| MySQL
     end
 
-    subgraph Event & Messaging Infrastructure
-        Order -->|Publish OrderCompletedEvent| RabbitMQ["RabbitMQ (Port 5672 AMQP / 15672 UI)<br/>Exchange: order.events.exchange"]
-        RabbitMQ -->|Consume order.completed.queue| Notification
+    subgraph Messaging_Infrastructure["Messaging Infrastructure"]
+        Order -->|"Publish OrderCompletedEvent"| RabbitMQ["RabbitMQ Broker (Port 5672 AMQP / 15672 UI)<br/>Exchange: order.events.exchange"]
+        RabbitMQ -->|"Consume order.completed.queue"| Notification
     end
 
-    subgraph Email Delivery Sink
-        Notification -->|SMTP (Port 1025)| MailHog["MailHog (Port 8025 Web UI)"]
+    subgraph Email_Sink["Email Delivery Sink"]
+        Notification -->|"SMTP (Port 1025)"| MailHog["MailHog Web UI (Port 8025)"]
     end
 ```
 
@@ -103,7 +103,7 @@ sequenceDiagram
 
     Customer->>Gateway: POST /api/orders/checkout
     Gateway->>Order: Forward to /api/checkout
-    Order->>Order: Persist Order & Clear Basket
+    Order->>Order: Persist Order and Clear Basket
     Order->>Rabbit: Publish OrderCompletedEvent to order.events.exchange (Routing Key: order.completed)
     Order-->>Customer: Return CheckoutResponse (Order Placed)
 
@@ -123,18 +123,18 @@ Each microservice maintains strict database isolation within the shared MySQL se
 erDiagram
     CAKES {
         bigint id PK
-        varchar name
-        varchar description
-        varchar category
+        string name
+        string description
+        string category
         double price
         int stock
-        varchar image_url
+        string image_url
     }
 
     BASKET_ITEMS {
         bigint id PK
         bigint cake_id
-        varchar cake_name
+        string cake_name
         double price_snapshot
         int quantity
         double subtotal
@@ -143,7 +143,7 @@ erDiagram
     ORDERS {
         bigint order_id PK
         double total_amount
-        varchar status
+        string status
         datetime order_date
     }
 
@@ -151,7 +151,7 @@ erDiagram
         bigint id PK
         bigint order_id FK
         bigint cake_id
-        varchar cake_name
+        string cake_name
         double price
         int quantity
     }
@@ -161,16 +161,16 @@ erDiagram
         bigint cake_id
         bigint user_id
         int score
-        varchar comment
+        string comment
         datetime created_at
     }
 
     NOTIFICATIONS {
         bigint id PK
-        uuid event_id UK
+        string event_id UK
         bigint order_id
-        varchar channel
-        varchar status
+        string channel
+        string status
         datetime sent_at
         datetime created_at
         datetime updated_at
