@@ -51,6 +51,8 @@ For detailed architectural sequence flows and ER diagrams, see [docs/architectur
 
 ## 🚀 Quick Start Guide (Docker Compose - Recommended)
 
+After extracting the submission ZIP, open a terminal in the `cake-delight` directory before running the commands below.
+
 All microservices use multi-stage Docker builds, so no local Maven installation or host compilation step is required.
 
 ### Step 1: Start All Infrastructure & Microservices
@@ -222,6 +224,8 @@ An automated Postman collection is included in the codebase:
 ---
 
 ## ☸️ Kubernetes Deployment Guide (`k8s/`)
+
+After extracting the submission ZIP, open a terminal in the `cake-delight` directory before running the commands below.
 
 This section provides complete step-by-step instructions for deploying and verifying the **Cake Delight** microservices stack on a local **Minikube** Kubernetes cluster from a clean environment.
 
