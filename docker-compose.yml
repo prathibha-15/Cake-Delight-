@@ -50,16 +50,22 @@ services:
       mysql:
         condition: service_healthy
 
-    ports:
-      - "8081:8081"
-
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cake_catalog
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      GATEWAY_INTERNAL_SECRET: "c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk="
 
     networks:
       - cake-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   order-service:
     build:
@@ -73,20 +79,26 @@ services:
       rabbitmq:
         condition: service_healthy
 
-    ports:
-      - "8082:8082"
-
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cake_order
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: guest
       RABBITMQ_PASSWORD: guest
+      GATEWAY_INTERNAL_SECRET: "c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk="
 
     networks:
       - cake-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   rating-service:
     build:
@@ -98,16 +110,22 @@ services:
       mysql:
         condition: service_healthy
 
-    ports:
-      - "8083:8083"
-
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cake_rating
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      GATEWAY_INTERNAL_SECRET: "c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk="
 
     networks:
       - cake-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
@@ -134,13 +152,11 @@ services:
       mailhog:
         condition: service_started
 
-    ports:
-      - "8084:8084"
-
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/notification_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: guest
@@ -151,9 +167,44 @@ services:
       NOTIFICATION_MAIL_FROM: no-reply@cakedelight.local
       NOTIFICATION_MAIL_TO: demo@cakedelight.local
       NOTIFICATION_MAIL_SUBJECT_PREFIX: "[Cake Delight]"
+      GATEWAY_INTERNAL_SECRET: "c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk="
 
     networks:
       - cake-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  user-service:
+    build:
+      context: ./user-service
+
+    container_name: user-service
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: Sweetlife&15
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      GATEWAY_INTERNAL_SECRET: "c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk="
+
+    networks:
+      - cake-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   api-gateway:
     build:
@@ -163,19 +214,35 @@ services:
 
     depends_on:
       catalog-service:
-        condition: service_started
+        condition: service_healthy
       order-service:
-        condition: service_started
+        condition: service_healthy
       rating-service:
-        condition: service_started
+        condition: service_healthy
       notification-service:
-        condition: service_started
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
 
     ports:
       - "8080:8080"
 
+    environment:
+      USER_SERVICE_URL: http://user-service:8085
+      GATEWAY_INTERNAL_SECRET: "c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk="
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
     networks:
       - cake-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
 volumes:
   mysql-data:

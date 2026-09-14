@@ -24,6 +24,17 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidCredentials(InvalidCredentialsException ex) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("timestamp", LocalDateTime.now());
+        response.put("status", HttpStatus.UNAUTHORIZED.value());
+        response.put("error", "Unauthorized");
+        response.put("message", ex.getMessage());
+
+        return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, Object> response = new LinkedHashMap<>();

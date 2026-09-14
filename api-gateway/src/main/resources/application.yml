@@ -10,6 +10,8 @@ spring:
   cloud:
     gateway:
       httpclient:
+        connect-timeout: 3000
+        response-timeout: 5s
         wiretap: true
       httpserver:
         wiretap: true
@@ -21,6 +23,7 @@ management:
         include: health,info
   endpoint:
     health:
+      show-details: always
       probes:
         enabled: true
   health:
@@ -28,4 +31,18 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+
+jwt:
+  secret: ${JWT_SECRET:c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk=}
+
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET:c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk=}
+
+logging:
+  level:
+    org.springframework.cloud.gateway: TRACE
+    org.springframework.http.server.reactive: DEBUG
+    org.springframework.web.reactive: DEBUG
+
+
 

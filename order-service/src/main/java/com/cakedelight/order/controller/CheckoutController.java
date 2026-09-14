@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.cakedelight.order.exception.UnauthorizedAccessException;
+
 @RestController
 @RequestMapping("/api")
 @Tag(name = "Checkout API")
@@ -21,9 +23,14 @@ public class CheckoutController {
 
     @PostMapping("/checkout")
     @Operation(summary = "Checkout basket")
-    public ResponseEntity<CheckoutResponse> checkout() {
+    public ResponseEntity<CheckoutResponse> checkout(
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+
+        if (userId == null) {
+            throw new UnauthorizedAccessException("Missing or invalid user identity header");
+        }
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.checkout());
+                .body(orderService.checkout(userId));
     }
 }

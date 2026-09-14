@@ -1,5 +1,7 @@
 package com.cakedelight.user.controller;
 
+import com.cakedelight.user.dto.AuthResponse;
+import com.cakedelight.user.dto.LoginRequest;
 import com.cakedelight.user.dto.RegisterRequest;
 import com.cakedelight.user.dto.UserResponse;
 import com.cakedelight.user.service.UserService;
@@ -25,5 +27,11 @@ public class AuthController {
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         UserResponse response = userService.registerUser(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        AuthResponse response = userService.loginUser(request);
+        return ResponseEntity.ok(response);
     }
 }

@@ -9,12 +9,18 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import org.springframework.amqp.core.QueueBuilder;
+
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String ORDER_COMPLETED_QUEUE = "order.completed.queue";
-    public static final String ORDER_COMPLETED_EXCHANGE = "order.events.exchange";
+    public static final String ORDER_COMPLETED_QUEUE = "notification.order.completed";
+    public static final String ORDER_COMPLETED_EXCHANGE = "cake-delight.exchange";
     public static final String ORDER_COMPLETED_ROUTING_KEY = "order.completed";
+
+    public static final String DLX_EXCHANGE = "cake-delight.dlx";
+    public static final String DLQ_QUEUE = "notification.order.completed.dlq";
+    public static final String DLQ_ROUTING_KEY = "notification.order.completed.dlq";
 
     @Bean
     public DirectExchange orderCompletedExchange() {
@@ -22,8 +28,29 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(DLX_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue deadLetterQueue() {
+        return new Queue(DLQ_QUEUE, true);
+    }
+
+    @Bean
+    public Binding deadLetterBinding() {
+        return BindingBuilder
+                .bind(deadLetterQueue())
+                .to(deadLetterExchange())
+                .with(DLQ_ROUTING_KEY);
+    }
+
+    @Bean
     public Queue orderCompletedQueue() {
-        return new Queue(ORDER_COMPLETED_QUEUE, true);
+        return QueueBuilder.durable(ORDER_COMPLETED_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLX_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", DLQ_ROUTING_KEY)
+                .build();
     }
 
     @Bean

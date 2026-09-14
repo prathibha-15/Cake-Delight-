@@ -17,6 +17,9 @@ public class BasketItem {
     private Long id;
 
     @Column(nullable = false)
+    private Long userId;
+
+    @Column(nullable = false)
     private Long cakeId;
 
     @Column(nullable = false)
