@@ -74,19 +74,41 @@ public class NotificationServiceImpl implements NotificationService {
                 event.getStatus()
         );
 
-        try {
-            notificationSender.send(saved, payload);
+        int maxAttempts = 3;
+        int attempt = 0;
+        boolean sent = false;
+
+        while (attempt < maxAttempts && !sent) {
+            attempt++;
+            try {
+                notificationSender.send(saved, payload);
+                sent = true;
+            } catch (Exception e) {
+                log.warn("Attempt {}/{} to send email for order ID: {} failed: {}",
+                        attempt, maxAttempts, event.getOrderId(), e.getMessage());
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (sent) {
             saved.setStatus(NotificationStatus.SENT);
             saved.setSentAt(LocalDateTime.now());
             saved.setUpdatedAt(LocalDateTime.now());
             log.info("Successfully sent notification for order ID: {}", event.getOrderId());
             return notificationMapper.toResponse(notificationRepository.save(saved));
-        } catch (Exception e) {
-            log.error("Failed notification attempt for order ID: {}. Error: {}", event.getOrderId(), e.getMessage());
+        } else {
+            log.error("All email notification attempts failed for order ID: {}. Marking status as FAILED.", event.getOrderId());
             saved.setStatus(NotificationStatus.FAILED);
             saved.setUpdatedAt(LocalDateTime.now());
-            notificationRepository.save(saved);
-            throw e; // Rethrow to allow Spring AMQP retries to trigger
+            Notification failedRecord = notificationRepository.save(saved);
+            return notificationMapper.toResponse(failedRecord);
         }
     }
 

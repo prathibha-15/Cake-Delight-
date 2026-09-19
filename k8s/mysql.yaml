@@ -1,4 +1,17 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-config
+  namespace: cake-delight
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS cake_catalog;
+    CREATE DATABASE IF NOT EXISTS cake_order;
+    CREATE DATABASE IF NOT EXISTS cake_rating;
+    CREATE DATABASE IF NOT EXISTS notification_db;
+    CREATE DATABASE IF NOT EXISTS user_db;
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mysql-pvc
@@ -41,30 +54,37 @@ spec:
           volumeMounts:
             - name: mysql-storage
               mountPath: /var/lib/mysql
+              subPath: data
+            - name: mysql-init-script
+              mountPath: /docker-entrypoint-initdb.d
+          startupProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
           readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
-            initialDelaySeconds: 45
-            periodSeconds: 20
-            timeoutSeconds: 15
-            failureThreshold: 6
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
           livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
-            initialDelaySeconds: 60
-            periodSeconds: 30
-            timeoutSeconds: 15
-            failureThreshold: 6
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
       volumes:
         - name: mysql-storage
           persistentVolumeClaim:
             claimName: mysql-pvc
+        - name: mysql-init-script
+          configMap:
+            name: mysql-init-config
 ---
 apiVersion: v1
 kind: Service

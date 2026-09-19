@@ -21,7 +21,15 @@ public class OrderCompletedListener {
 
     @RabbitListener(queues = RabbitMQConfig.ORDER_COMPLETED_QUEUE)
     public void handleOrderCompleted(OrderCompletedEvent event) {
-        log.info("Received OrderCompletedEvent for order ID: {}", event != null ? event.getOrderId() : null);
-        notificationService.handleOrderCompleted(event);
+        if (event == null || event.getEventId() == null || event.getOrderId() == null) {
+            log.warn("Received invalid or null OrderCompletedEvent, skipping processing.");
+            return;
+        }
+        log.info("Received OrderCompletedEvent for order ID: {}, event ID: {}", event.getOrderId(), event.getEventId());
+        try {
+            notificationService.handleOrderCompleted(event);
+        } catch (Exception ex) {
+            log.error("Unhandled error processing OrderCompletedEvent for order ID: {}. Error: {}", event.getOrderId(), ex.getMessage(), ex);
+        }
     }
 }

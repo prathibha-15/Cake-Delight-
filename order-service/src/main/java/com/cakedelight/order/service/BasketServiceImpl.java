@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,25 +28,37 @@ public class BasketServiceImpl implements BasketService {
 
     public BasketServiceImpl(
             BasketItemRepository basketRepository,
-            @Value("${catalog.service.base-url:http://catalog-service:8081}") String catalogServiceBaseUrl) {
+            @Value("${catalog.service.base-url:http://catalog-service:8081}") String catalogServiceBaseUrl,
+            @Value("${gateway.internal-secret:c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk=}") String internalSecret) {
         this.basketRepository = basketRepository;
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(3000);
+        requestFactory.setReadTimeout(5000);
+
         this.catalogClient = RestClient.builder()
                 .baseUrl(catalogServiceBaseUrl)
+                .requestFactory(requestFactory)
+                .defaultHeader("X-Internal-Secret", internalSecret)
                 .build();
     }
 
     @Override
-    public BasketItemResponse addToBasket(BasketItemRequest request) {
+    public BasketItemResponse addToBasket(Long userId, BasketItemRequest request) {
 
         CakeDetailsResponse cake = fetchCake(request.getCakeId());
 
-        BasketItem item = new BasketItem();
+        BasketItem item = basketRepository.findByUserIdAndCakeId(userId, request.getCakeId())
+                .orElseGet(() -> {
+                    BasketItem newItem = new BasketItem();
+                    newItem.setUserId(userId);
+                    newItem.setCakeId(request.getCakeId());
+                    newItem.setCakeName(cake.name());
+                    newItem.setPriceSnapshot(cake.price());
+                    newItem.setQuantity(0);
+                    return newItem;
+                });
 
-        item.setCakeId(request.getCakeId());
-        item.setCakeName(cake.name());
-        item.setPriceSnapshot(cake.price());
-
-        item.setQuantity(request.getQuantity());
+        item.setQuantity(item.getQuantity() + request.getQuantity());
 
         BasketItem saved = basketRepository.save(item);
 
@@ -53,9 +66,9 @@ public class BasketServiceImpl implements BasketService {
     }
 
     @Override
-    public BasketItemResponse updateBasketItem(Long itemId, BasketItemRequest request) {
+    public BasketItemResponse updateBasketItem(Long userId, Long itemId, BasketItemRequest request) {
 
-        BasketItem item = basketRepository.findById(itemId)
+        BasketItem item = basketRepository.findByIdAndUserId(itemId, userId)
                 .orElseThrow(() ->
                         new BasketItemNotFoundException("Basket item not found"));
 
@@ -74,15 +87,19 @@ public class BasketServiceImpl implements BasketService {
     }
 
     @Override
-    public void removeBasketItem(Long itemId) {
+    public void removeBasketItem(Long userId, Long itemId) {
 
-        basketRepository.deleteById(itemId);
+        BasketItem item = basketRepository.findByIdAndUserId(itemId, userId)
+                .orElseThrow(() ->
+                        new BasketItemNotFoundException("Basket item not found"));
+
+        basketRepository.delete(item);
     }
 
     @Override
-    public BasketResponse getBasket() {
+    public BasketResponse getBasket(Long userId) {
 
-        List<BasketItem> items = basketRepository.findAll();
+        List<BasketItem> items = basketRepository.findByUserId(userId);
 
         List<BasketItemResponse> responses = items.stream()
                 .map(OrderMapper::toBasketResponse)

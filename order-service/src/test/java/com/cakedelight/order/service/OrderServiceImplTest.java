@@ -53,6 +53,7 @@ class OrderServiceImplTest {
     void setUp() {
         sampleBasketItem = new BasketItem();
         sampleBasketItem.setId(1L);
+        sampleBasketItem.setUserId(1L);
         sampleBasketItem.setCakeId(10L);
         sampleBasketItem.setCakeName("Chocolate Truffle");
         sampleBasketItem.setPriceSnapshot(799.0);
@@ -60,6 +61,7 @@ class OrderServiceImplTest {
 
         sampleOrder = new Order();
         sampleOrder.setId(100L);
+        sampleOrder.setUserId(1L);
         sampleOrder.setOrderDate(LocalDateTime.now());
         sampleOrder.setStatus(OrderStatus.CREATED);
         sampleOrder.setTotalAmount(1598.0);
@@ -77,12 +79,12 @@ class OrderServiceImplTest {
 
     @Test
     void checkout_WithBasketItems_ShouldCreateOrderAndPublishEvent() {
-        when(basketRepository.findAll()).thenReturn(List.of(sampleBasketItem));
+        when(basketRepository.findByUserId(1L)).thenReturn(List.of(sampleBasketItem));
         when(orderRepository.save(any(Order.class))).thenReturn(sampleOrder);
         doNothing().when(orderEventPublisher).publish(any(OrderCompletedEvent.class));
-        doNothing().when(basketRepository).deleteAll();
+        doNothing().when(basketRepository).deleteByUserId(1L);
 
-        CheckoutResponse response = orderService.checkout();
+        CheckoutResponse response = orderService.checkout(1L);
 
         assertNotNull(response);
         assertEquals("Order placed successfully", response.getMessage());
@@ -91,22 +93,40 @@ class OrderServiceImplTest {
 
         verify(orderRepository).save(any(Order.class));
         verify(orderEventPublisher).publish(any(OrderCompletedEvent.class));
-        verify(basketRepository).deleteAll();
+        verify(basketRepository).deleteByUserId(1L);
     }
 
     @Test
     void checkout_EmptyBasket_ShouldThrowException() {
-        when(basketRepository.findAll()).thenReturn(Collections.emptyList());
+        when(basketRepository.findByUserId(1L)).thenReturn(Collections.emptyList());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> orderService.checkout());
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> orderService.checkout(1L));
         assertEquals("Basket is empty", ex.getMessage());
     }
 
     @Test
-    void getOrder_ExistingId_ShouldReturnOrderResponse() {
+    void getOrder_ExistingIdAndOwner_ShouldReturnOrderResponse() {
         when(orderRepository.findById(100L)).thenReturn(Optional.of(sampleOrder));
 
-        OrderResponse response = orderService.getOrder(100L);
+        OrderResponse response = orderService.getOrder(100L, 1L, "ROLE_USER");
+
+        assertNotNull(response);
+        assertEquals(100L, response.getOrderId());
+    }
+
+    @Test
+    void getOrder_OtherUser_ShouldThrowForbiddenException() {
+        when(orderRepository.findById(100L)).thenReturn(Optional.of(sampleOrder));
+
+        assertThrows(com.cakedelight.order.exception.ForbiddenAccessException.class,
+                () -> orderService.getOrder(100L, 2L, "ROLE_USER"));
+    }
+
+    @Test
+    void getOrder_AdminAccess_ShouldReturnOrderResponse() {
+        when(orderRepository.findById(100L)).thenReturn(Optional.of(sampleOrder));
+
+        OrderResponse response = orderService.getOrder(100L, 2L, "ROLE_ADMIN");
 
         assertNotNull(response);
         assertEquals(100L, response.getOrderId());
@@ -116,6 +136,29 @@ class OrderServiceImplTest {
     void getOrder_NonExistingId_ShouldThrowException() {
         when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThrows(OrderNotFoundException.class, () -> orderService.getOrder(999L));
+        assertThrows(OrderNotFoundException.class, () -> orderService.getOrder(999L, 1L, "ROLE_USER"));
+    }
+
+    @Test
+    void getUserOrders_WithExistingOrders_ShouldReturnOrderList() {
+        when(orderRepository.findByUserIdOrderByOrderDateDesc(1L)).thenReturn(List.of(sampleOrder));
+
+        List<OrderResponse> responses = orderService.getUserOrders(1L);
+
+        assertNotNull(responses);
+        assertEquals(1, responses.size());
+        assertEquals(100L, responses.get(0).getOrderId());
+        verify(orderRepository).findByUserIdOrderByOrderDateDesc(1L);
+    }
+
+    @Test
+    void getUserOrders_WhenNoOrders_ShouldReturnEmptyList() {
+        when(orderRepository.findByUserIdOrderByOrderDateDesc(2L)).thenReturn(Collections.emptyList());
+
+        List<OrderResponse> responses = orderService.getUserOrders(2L);
+
+        assertNotNull(responses);
+        assertTrue(responses.isEmpty());
+        verify(orderRepository).findByUserIdOrderByOrderDateDesc(2L);
     }
 }

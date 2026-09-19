@@ -6,11 +6,11 @@ import com.cakedelight.order.dto.BasketResponse;
 
 public interface BasketService {
 
-    BasketItemResponse addToBasket(BasketItemRequest request);
+    BasketItemResponse addToBasket(Long userId, BasketItemRequest request);
 
-    BasketItemResponse updateBasketItem(Long itemId, BasketItemRequest request);
+    BasketItemResponse updateBasketItem(Long userId, Long itemId, BasketItemRequest request);
 
-    void removeBasketItem(Long itemId);
+    void removeBasketItem(Long userId, Long itemId);
 
-    BasketResponse getBasket();
+    BasketResponse getBasket(Long userId);
 }

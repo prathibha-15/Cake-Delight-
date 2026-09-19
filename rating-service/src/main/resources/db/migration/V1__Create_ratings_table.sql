@@ -1,0 +1,8 @@
+CREATE TABLE ratings (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    cake_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    score INT NOT NULL,
+    comment VARCHAR(1000),
+    created_at DATETIME(6) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

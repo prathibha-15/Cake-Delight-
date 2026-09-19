@@ -47,7 +47,7 @@ class NotificationServiceImplTest {
     @BeforeEach
     void setUp() {
         eventId = UUID.randomUUID();
-        sampleEvent = new OrderCompletedEvent(eventId, 100L, LocalDateTime.now(), 1598.0, "CREATED");
+        sampleEvent = new OrderCompletedEvent(eventId, 100L, 1L, LocalDateTime.now(), 1598.0, "CREATED");
 
         sampleNotification = new Notification();
         sampleNotification.setId(1L);
@@ -114,5 +114,23 @@ class NotificationServiceImplTest {
 
         assertEquals(1, result.size());
         assertEquals(100L, result.get(0).getOrderId());
+    }
+
+    @Test
+    void handleOrderCompleted_EmailFailure_ShouldRetryAndMarkFailed() {
+        when(notificationRepository.findByEventId(eventId)).thenReturn(Optional.empty());
+        when(notificationRepository.save(any(Notification.class))).thenReturn(sampleNotification);
+        doThrow(new RuntimeException("Mail server down"))
+                .when(notificationSender).send(any(Notification.class), any(NotificationEmailPayload.class));
+
+        LocalDateTime now = LocalDateTime.now();
+        NotificationResponse failedResponse = new NotificationResponse(1L, eventId, 100L, "EMAIL", NotificationStatus.FAILED, now, now, now);
+        when(notificationMapper.toResponse(any(Notification.class))).thenReturn(failedResponse);
+
+        NotificationResponse response = notificationService.handleOrderCompleted(sampleEvent);
+
+        assertNotNull(response);
+        assertEquals(NotificationStatus.FAILED, response.getStatus());
+        verify(notificationSender, times(3)).send(any(Notification.class), any(NotificationEmailPayload.class));
     }
 }

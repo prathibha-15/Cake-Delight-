@@ -46,9 +46,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public CheckoutResponse checkout() {
+    public CheckoutResponse checkout(Long userId) {
 
-        List<BasketItem> basketItems = basketRepository.findAll();
+        List<BasketItem> basketItems = basketRepository.findByUserId(userId);
 
         if (basketItems.isEmpty()) {
             throw new RuntimeException("Basket is empty");
@@ -57,6 +57,7 @@ public class OrderServiceImpl implements OrderService {
         double totalAmount = 0;
 
         Order order = new Order();
+        order.setUserId(userId);
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.CREATED);
 
@@ -85,11 +86,12 @@ public class OrderServiceImpl implements OrderService {
 
         orderItemRepository.saveAll(orderItems);
 
-        log.info("Created order ID: {} with total amount: {}", savedOrder.getId(), savedOrder.getTotalAmount());
+        log.info("Created order ID: {} for user ID: {} with total amount: {}", savedOrder.getId(), userId, savedOrder.getTotalAmount());
 
         OrderCompletedEvent orderCompletedEvent = new OrderCompletedEvent(
                 UUID.randomUUID(),
                 savedOrder.getId(),
+                savedOrder.getUserId(),
                 savedOrder.getOrderDate(),
                 savedOrder.getTotalAmount(),
                 savedOrder.getStatus().name()
@@ -98,7 +100,7 @@ public class OrderServiceImpl implements OrderService {
         orderEventPublisher.publish(orderCompletedEvent);
         log.info("Published OrderCompletedEvent for order ID: {}", savedOrder.getId());
 
-        basketRepository.deleteAll();
+        basketRepository.deleteByUserId(userId);
 
         OrderResponse response = OrderMapper.toOrderResponse(savedOrder);
 
@@ -109,12 +111,28 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public OrderResponse getOrder(Long orderId) {
+    public OrderResponse getOrder(Long orderId, Long userId, String userRole) {
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() ->
                         new OrderNotFoundException("Order not found"));
 
-        return OrderMapper.toOrderResponse(order);
+        if ("ROLE_ADMIN".equals(userRole)) {
+            return OrderMapper.toOrderResponse(order);
+        }
+
+        if (order.getUserId() != null && order.getUserId().equals(userId)) {
+            return OrderMapper.toOrderResponse(order);
+        }
+
+        throw new com.cakedelight.order.exception.ForbiddenAccessException("Access denied: You do not own this order");
+    }
+
+    @Override
+    public List<OrderResponse> getUserOrders(Long userId) {
+        List<Order> orders = orderRepository.findByUserIdOrderByOrderDateDesc(userId);
+        return orders.stream()
+                .map(OrderMapper::toOrderResponse)
+                .collect(java.util.stream.Collectors.toList());
     }
 }

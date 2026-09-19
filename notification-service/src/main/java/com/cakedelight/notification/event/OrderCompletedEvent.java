@@ -19,6 +19,7 @@ public class OrderCompletedEvent implements Serializable {
 
     private UUID eventId;
     private Long orderId;
+    private Long userId;
     private LocalDateTime orderDate;
     private Double totalAmount;
     private String status;

@@ -47,10 +47,25 @@
       line-height: 1;
     }
 
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
     .topbar-note {
       font-size: 1rem;
       font-weight: 700;
       opacity: 0.92;
+    }
+
+    .user-badge-header {
+      font-size: 0.9rem;
+      background: rgba(255, 255, 255, 0.22);
+      padding: 6px 12px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 700;
     }
 
     .hero {
@@ -275,7 +290,8 @@
     }
 
     .panel input,
-    .panel textarea {
+    .panel textarea,
+    .panel select {
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 10px 12px;
@@ -286,6 +302,54 @@
     .panel textarea {
       min-height: 72px;
       resize: vertical;
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px;
+      background: #f8f6f4;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #3c2d25;
+    }
+
+    .auth-tab.active-tab {
+      background: var(--brand);
+      color: white;
+      border-color: var(--brand);
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .user-card {
+      background: #fff7f4;
+      border: 1px solid #ebdcd5;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .orders-list-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: #faf8f6;
     }
 
     .message {
@@ -376,7 +440,10 @@
 <body>
   <header class="topbar">
     <div class="brand">Cake Delight</div>
-    <div class="topbar-note">Fresh cakes, live basket totals, and real ratings</div>
+    <div class="topbar-right">
+      <span class="topbar-note">Fresh cakes, live basket totals, and real ratings</span>
+      <div id="topbarUserNav"></div>
+    </div>
   </header>
 
   <div class="hero">
@@ -410,22 +477,71 @@
       </section>
 
       <aside class="sidebar">
+        <!-- Auth Panel -->
+        <section id="authSection" class="panel" style="margin-top:0; padding-top:0; border-top:none;">
+          <div id="loggedOutView">
+            <div class="auth-tabs">
+              <button type="button" id="tabLogin" class="auth-tab active-tab">Login</button>
+              <button type="button" id="tabRegister" class="auth-tab">Register</button>
+            </div>
+            <form id="loginForm" class="auth-form">
+              <input id="loginUsername" type="text" placeholder="Username" required />
+              <input id="loginPassword" type="password" placeholder="Password" required />
+              <button type="submit" class="primary">Log in</button>
+            </form>
+            <form id="registerForm" class="auth-form" style="display: none;">
+              <input id="regUsername" type="text" placeholder="Username (min 3 chars)" required />
+              <input id="regEmail" type="email" placeholder="Email" required />
+              <input id="regPassword" type="password" placeholder="Password (min 6 chars)" required />
+              <button type="submit" class="primary">Register</button>
+            </form>
+            <div id="authMessage" class="message"></div>
+          </div>
+          <div id="loggedInView" style="display: none;">
+            <div class="user-card">
+              <div>Logged in as: <strong id="userNameDisplay"></strong></div>
+              <div class="muted">Role: <span id="userRoleDisplay"></span></div>
+              <button type="button" id="logoutBtn" class="ghost" style="width:100%; margin-top:8px;">Logout</button>
+            </div>
+          </div>
+        </section>
+
         <h3>Basket</h3>
         <div id="basketSummary" class="muted"></div>
         <div id="basket"></div>
         <button id="checkout" class="primary" style="width:100%; margin-top: 12px;">Checkout</button>
         <div id="basketMessage" class="message"></div>
 
+        <!-- Admin Panel (Shown only for ROLE_ADMIN) -->
+        <section id="adminSection" class="panel" style="display:none; background:#fffbf7; border:1px solid #f2e2d5; border-radius:12px; padding:12px;">
+          <h3 style="margin-top:0; color:#b23b14;">⚙️ Cake Management (Admin)</h3>
+          <form id="adminCreateCakeForm">
+            <input id="adminCakeName" type="text" placeholder="Cake Name" required />
+            <input id="adminCakeCategory" type="text" placeholder="Category (e.g. Chocolate)" required />
+            <input id="adminCakePrice" type="number" min="1" step="any" placeholder="Price (₹)" required />
+            <input id="adminCakeStock" type="number" min="0" placeholder="Stock quantity" required />
+            <textarea id="adminCakeDesc" placeholder="Description"></textarea>
+            <input id="adminCakeImageUrl" type="url" placeholder="Image URL (optional)" />
+            <button type="submit" class="primary" style="background:#b23b14;">Add Cake</button>
+          </form>
+          <div id="adminMessage" class="message"></div>
+        </section>
+
         <section class="panel">
           <h3>Rate Cake</h3>
+          <div style="font-size:0.85rem; margin-bottom:6px;">Posting rating as: <strong id="ratingUsernameDisplay">Please log in</strong></div>
           <form id="ratingForm">
             <input id="ratingCakeId" type="number" placeholder="Cake ID" required />
-            <input id="ratingUserId" type="number" placeholder="User ID" required />
             <input id="ratingScore" type="number" min="1" max="5" placeholder="Score 1-5" required />
             <textarea id="ratingComment" placeholder="Comment"></textarea>
             <button type="submit" class="primary">Submit rating</button>
           </form>
           <div id="ratingMessage" class="message"></div>
+        </section>
+
+        <section id="userOrdersPanel" class="panel" style="display:none;">
+          <h3>My Orders</h3>
+          <div id="recentOrdersList"></div>
         </section>
       </aside>
     </div>
@@ -443,14 +559,63 @@
     </div>
   </div>
 
+  <div id="editCakeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="editCakeModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="editCakeModalTitle">Edit Cake</h3>
+        <button id="closeEditModal" class="ghost" type="button">Close</button>
+      </div>
+      <form id="adminEditCakeForm" style="display:grid; gap:8px;">
+        <input id="editCakeId" type="hidden" />
+        <div>
+          <label class="muted" style="font-size:0.8rem;">Cake Name</label>
+          <input id="editCakeName" type="text" required style="width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px;" />
+        </div>
+        <div>
+          <label class="muted" style="font-size:0.8rem;">Category</label>
+          <input id="editCakeCategory" type="text" required style="width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px;" />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label class="muted" style="font-size:0.8rem;">Price (₹)</label>
+            <input id="editCakePrice" type="number" min="1" step="any" required style="width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px;" />
+          </div>
+          <div>
+            <label class="muted" style="font-size:0.8rem;">Stock</label>
+            <input id="editCakeStock" type="number" min="0" required style="width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px;" />
+          </div>
+        </div>
+        <div>
+          <label class="muted" style="font-size:0.8rem;">Description</label>
+          <textarea id="editCakeDesc" style="width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-height:60px;"></textarea>
+        </div>
+        <div>
+          <label class="muted" style="font-size:0.8rem;">Image URL</label>
+          <input id="editCakeImageUrl" type="url" style="width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px;" />
+        </div>
+        <button type="submit" class="primary" style="margin-top:8px;">Save Changes</button>
+      </form>
+      <div id="editCakeMessage" class="message"></div>
+    </div>
+  </div>
+
   <script>
     const API = {
       catalog: "/api/catalog/cakes",
+      cakeCreate: "/api/catalog/cakes",
+      cakeUpdate: (id) => `/api/catalog/cakes/${id}`,
+      cakeDelete: (id) => `/api/catalog/cakes/${id}`,
+      cakeById: (id) => `/api/catalog/cakes/${id}`,
       basket: "/api/orders/basket",
       checkout: "/api/orders/checkout",
       ratingCreate: "/api/ratings",
       ratingAverage: (cakeId) => `/api/ratings/cakes/${cakeId}/average`,
-      ratingList: (cakeId) => `/api/ratings/cakes/${cakeId}`
+      ratingList: (cakeId) => `/api/ratings/cakes/${cakeId}`,
+      register: "/api/auth/register",
+      login: "/api/auth/login",
+      ordersList: "/api/orders",
+      order: (id) => `/api/orders/${id}`,
+      notifications: (orderId) => `/api/notifications/${orderId}`
     };
 
     const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=900&q=80";
@@ -467,11 +632,34 @@
     const catalogErrorEl = document.getElementById("catalogError");
     const basketMessageEl = document.getElementById("basketMessage");
     const ratingMessageEl = document.getElementById("ratingMessage");
+    const authMessageEl = document.getElementById("authMessage");
 
     const ratingsModalEl = document.getElementById("ratingsModal");
     const ratingsModalSummaryEl = document.getElementById("ratingsModalSummary");
     const ratingsModalErrorEl = document.getElementById("ratingsModalError");
     const ratingsModalListEl = document.getElementById("ratingsModalList");
+
+    const tabLogin = document.getElementById("tabLogin");
+    const tabRegister = document.getElementById("tabRegister");
+    const loginForm = document.getElementById("loginForm");
+    const registerForm = document.getElementById("registerForm");
+    const loggedOutView = document.getElementById("loggedOutView");
+    const loggedInView = document.getElementById("loggedInView");
+    const userNameDisplay = document.getElementById("userNameDisplay");
+    const userRoleDisplay = document.getElementById("userRoleDisplay");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const topbarUserNav = document.getElementById("topbarUserNav");
+    const userOrdersPanel = document.getElementById("userOrdersPanel");
+    const recentOrdersListEl = document.getElementById("recentOrdersList");
+
+    const adminSection = document.getElementById("adminSection");
+    const adminCreateCakeForm = document.getElementById("adminCreateCakeForm");
+    const adminMessage = document.getElementById("adminMessage");
+    const editCakeModal = document.getElementById("editCakeModal");
+    const closeEditModalBtn = document.getElementById("closeEditModal");
+    const adminEditCakeForm = document.getElementById("adminEditCakeForm");
+    const editCakeMessage = document.getElementById("editCakeMessage");
+    const ratingUsernameDisplay = document.getElementById("ratingUsernameDisplay");
 
     let activeCategory = "";
     let allCategoriesSet = new Set();
@@ -479,7 +667,11 @@
     let currentModalCakeId = null;
     let lastCatalog = [];
 
+    let authToken = null;
+    let currentUser = null;
+
     function setMessage(element, text, type) {
+      if (!element) return;
       element.className = "message";
       element.textContent = "";
       if (!text) {
@@ -497,12 +689,181 @@
       }).format(Number(amount || 0));
     }
 
+    async function loadUserOrderHistory() {
+      if (!recentOrdersListEl || !authToken || !currentUser) return;
+      userOrdersPanel.style.display = "block";
+      recentOrdersListEl.innerHTML = `<div class="muted">Loading order history...</div>`;
+
+      const response = await apiJson(API.ordersList);
+      if (!response.ok) {
+        recentOrdersListEl.innerHTML = `<div class="muted">Failed to load orders.</div>`;
+        return;
+      }
+
+      const orders = Array.isArray(response.data) ? response.data : [];
+      if (!orders.length) {
+        recentOrdersListEl.innerHTML = `<div class="muted">No orders placed yet.</div>`;
+        return;
+      }
+
+      const orderCards = await Promise.all(orders.map(async (o) => {
+        const notifRes = await apiJson(API.notifications(o.orderId));
+        const dateStr = o.orderDate ? new Date(o.orderDate).toLocaleString() : "Recent";
+        const itemsList = Array.isArray(o.items) && o.items.length
+          ? `<div class="muted" style="font-size:0.85rem; margin-top:4px;"><strong>Items:</strong> ${o.items.map(i => `${i.cakeName} ×${i.quantity}`).join(", ")}</div>`
+          : "";
+
+        let notifHtml = "";
+        if (notifRes.ok && Array.isArray(notifRes.data) && notifRes.data.length) {
+          notifHtml = notifRes.data.map(n => `
+            <div class="muted" style="font-size:0.8rem; margin-top:2px;">
+              ✉️ ${n.channel}: <strong>${n.status}</strong>
+            </div>
+          `).join("");
+        }
+
+        return `
+          <div class="orders-list-item">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>Order #${o.orderId}</strong>
+              <span style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:4px; background:#eef9ef; color:#0f6d2f;">${o.status}</span>
+            </div>
+            <div class="muted" style="font-size:0.8rem; margin-top:2px;">Date: ${dateStr}</div>
+            <div style="font-weight:700; margin-top:4px;">Total: ${formatRupees(o.totalAmount)}</div>
+            ${itemsList}
+            ${notifHtml}
+          </div>
+        `;
+      }));
+
+      recentOrdersListEl.innerHTML = orderCards.join("");
+    }
+
+    function loadAuthState() {
+      const storedToken = localStorage.getItem("jwt_token");
+      const storedUser = localStorage.getItem("user_info");
+      if (storedToken && storedToken.trim() !== "") {
+        authToken = storedToken;
+        if (storedUser) {
+          try {
+            currentUser = JSON.parse(storedUser);
+            if (typeof currentUser !== "object" || currentUser === null) {
+              currentUser = { username: "User", role: "ROLE_USER" };
+            }
+          } catch (e) {
+            currentUser = { username: "User", role: "ROLE_USER" };
+          }
+        } else {
+          currentUser = { username: "User", role: "ROLE_USER" };
+        }
+      } else {
+        clearAuthState();
+      }
+    }
+
+    function saveAuthState(token, user) {
+      authToken = token;
+      currentUser = user;
+      localStorage.setItem("jwt_token", token);
+      localStorage.setItem("user_info", JSON.stringify(user));
+    }
+
+    function clearAuthState() {
+      authToken = null;
+      currentUser = null;
+      localStorage.removeItem("jwt_token");
+      localStorage.removeItem("user_info");
+    }
+
+    function renderAuthState() {
+      const isAdmin = currentUser && currentUser.role === "ROLE_ADMIN";
+
+      if (authToken && currentUser) {
+        loggedOutView.style.display = "none";
+        loggedInView.style.display = "block";
+        userNameDisplay.textContent = currentUser.username || "User";
+        userRoleDisplay.textContent = currentUser.role || "ROLE_USER";
+
+        if (topbarUserNav) {
+          topbarUserNav.innerHTML = `<span class="user-badge-header">👤 ${currentUser.username || 'User'} (${currentUser.role || 'USER'})</span>`;
+        }
+
+        if (ratingUsernameDisplay) {
+          ratingUsernameDisplay.textContent = currentUser.username;
+        }
+
+        if (adminSection) {
+          adminSection.style.display = isAdmin ? "block" : "none";
+        }
+
+        fetchAndRenderBasket();
+        loadUserOrderHistory();
+      } else {
+        loggedOutView.style.display = "block";
+        loggedInView.style.display = "none";
+
+        if (topbarUserNav) {
+          topbarUserNav.innerHTML = ``;
+        }
+
+        if (ratingUsernameDisplay) {
+          ratingUsernameDisplay.textContent = "Please log in";
+        }
+
+        if (adminSection) {
+          adminSection.style.display = "none";
+        }
+
+        if (userOrdersPanel) {
+          userOrdersPanel.style.display = "none";
+        }
+        if (recentOrdersListEl) {
+          recentOrdersListEl.innerHTML = "";
+        }
+
+        currentBasket = { items: [], totalAmount: 0 };
+        renderBasketPanel(currentBasket);
+      }
+
+      if (lastCatalog && lastCatalog.length) {
+        renderCatalog(lastCatalog);
+        // Re-rendered cards start at "Loading rating..."; refresh them so no manual refresh is needed.
+        Promise.all(lastCatalog.map((cake) => refreshCakeAverage(cake.id)));
+      }
+    }
+
     async function apiJson(url, options = {}) {
       try {
-        const response = await fetch(url, options);
+        const headers = { ...options.headers };
+        if (authToken) {
+          headers["Authorization"] = `Bearer ${authToken}`;
+        }
+        delete headers["X-User-Id"];
+        delete headers["X-User-Role"];
+        delete headers["X-User-Name"];
+        delete headers["X-Internal-Secret"];
+
+        const response = await fetch(url, { ...options, headers });
         const text = await response.text();
         const data = text ? JSON.parse(text) : null;
+
         if (!response.ok) {
+          if (response.status === 401) {
+            clearAuthState();
+            renderAuthState();
+            return {
+              ok: false,
+              status: 401,
+              error: data?.message || "Please log in to continue."
+            };
+          }
+          if (response.status === 403) {
+            return {
+              ok: false,
+              status: 403,
+              error: data?.message || "Access denied: insufficient permissions."
+            };
+          }
           return {
             ok: false,
             status: response.status,
@@ -574,6 +935,12 @@
 
     function cardTemplate(cake) {
       const imageUrl = cake.imageUrl || FALLBACK_IMAGE;
+      const isAdmin = currentUser && currentUser.role === "ROLE_ADMIN";
+      const adminActions = isAdmin ? `
+        <button class="ghost" type="button" style="color:#b23b14;" onclick="openEditCakeModal(${cake.id})">Edit</button>
+        <button class="ghost" type="button" style="color:var(--brand);" onclick="deleteCakeAction(${cake.id})">Delete</button>
+      ` : "";
+
       return `
         <article class="cake-card">
           <div class="cake-image">
@@ -590,6 +957,7 @@
             <div class="card-actions">
               <button class="primary" type="button" onclick="addToBasket(${cake.id})">Add to basket</button>
               <button class="secondary" type="button" onclick="openRatingsModal(${cake.id})">Ratings</button>
+              ${adminActions}
             </div>
           </div>
         </article>
@@ -636,9 +1004,18 @@
 
     function renderBasketPanel(basket) {
       const items = basket.items || [];
-      basketSummaryEl.innerHTML = `<div class="basket-total">Basket total: ${formatRupees(basket.totalAmount || 0)}</div>`;
+
+      if (!authToken) {
+        basketSummaryEl.innerHTML = "";
+        basketEl.innerHTML = `<div class="muted">Please log in to view and manage your basket.</div>`;
+        checkoutBtn.disabled = true;
+        checkoutBtn.classList.add("secondary");
+        checkoutBtn.classList.remove("primary");
+        return;
+      }
 
       if (!items.length) {
+        basketSummaryEl.innerHTML = "";
         basketEl.innerHTML = `<div class="muted">Your basket is empty.</div>`;
         checkoutBtn.disabled = true;
         checkoutBtn.classList.add("secondary");
@@ -646,6 +1023,7 @@
         return;
       }
 
+      basketSummaryEl.innerHTML = `<div class="basket-total">Basket total: ${formatRupees(basket.totalAmount || 0)}</div>`;
       checkoutBtn.disabled = false;
       checkoutBtn.classList.add("primary");
       checkoutBtn.classList.remove("secondary");
@@ -663,8 +1041,15 @@
     }
 
     async function fetchAndRenderBasket() {
+      if (!authToken) {
+        currentBasket = { items: [], totalAmount: 0 };
+        renderBasketPanel(currentBasket);
+        return;
+      }
       const response = await apiJson(API.basket);
       if (!response.ok) {
+        currentBasket = { items: [], totalAmount: 0 };
+        renderBasketPanel(currentBasket);
         setMessage(basketMessageEl, response.error, "error");
         return;
       }
@@ -674,6 +1059,11 @@
 
     async function addToBasket(cakeId) {
       setMessage(basketMessageEl, "", "");
+      if (!authToken) {
+        setMessage(basketMessageEl, "Please log in to add items to your basket.", "error");
+        return;
+      }
+
       const response = await apiJson(API.basket, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -691,6 +1081,11 @@
 
     async function updateBasketItem(itemId, cakeId, quantity) {
       setMessage(basketMessageEl, "", "");
+      if (!authToken) {
+        setMessage(basketMessageEl, "Please log in to manage your basket.", "error");
+        return;
+      }
+
       const response = await apiJson(`${API.basket}/${itemId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -708,6 +1103,11 @@
 
     async function removeBasketItem(itemId) {
       setMessage(basketMessageEl, "", "");
+      if (!authToken) {
+        setMessage(basketMessageEl, "Please log in to manage your basket.", "error");
+        return;
+      }
+
       const response = await apiJson(`${API.basket}/${itemId}`, {
         method: "DELETE"
       });
@@ -723,6 +1123,11 @@
 
     async function checkout() {
       setMessage(basketMessageEl, "", "");
+
+      if (!authToken) {
+        setMessage(basketMessageEl, "Please log in to checkout.", "error");
+        return;
+      }
 
       if (!currentBasket.items || !currentBasket.items.length) {
         setMessage(basketMessageEl, "Basket is empty. Add items before checkout.", "error");
@@ -750,7 +1155,10 @@
         "success"
       );
 
+      // Re-fetch authoritative basket/order state from the backend instead of
+      // patching local state, so the UI never shows stale pre-checkout data.
       await fetchAndRenderBasket();
+      await loadUserOrderHistory();
     }
 
     async function openRatingsModal(cakeId) {
@@ -781,13 +1189,20 @@
 
       const reviews = Array.isArray(listRes.data) ? listRes.data : [];
       ratingsModalListEl.innerHTML = reviews.length
-        ? reviews.map((review) => `
-            <div class="review-item">
-              <strong>${review.score}/5</strong>
-              <div class="muted">User ${review.userId}</div>
-              <div>${review.comment || "No comment"}</div>
-            </div>
-          `).join("")
+        ? reviews.map((review) => {
+            const userLabel = `👤 ${review.username || "Customer"}`;
+            const dateStr = review.createdAt ? new Date(review.createdAt).toLocaleDateString() : "";
+            return `
+              <div class="review-item">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong class="star">★ ${review.score}/5</strong>
+                  <span class="muted" style="font-size:0.82rem;">${dateStr}</span>
+                </div>
+                <div style="font-weight:700; font-size:0.88rem; margin-top:2px;">${userLabel}</div>
+                <div style="margin-top:4px;">${review.comment || "No comment"}</div>
+              </div>
+            `;
+          }).join("")
         : `<div class="muted">No reviews for this cake yet.</div>`;
     }
 
@@ -800,10 +1215,22 @@
       event.preventDefault();
       setMessage(ratingMessageEl, "", "");
 
+      if (!authToken || !currentUser) {
+        setMessage(ratingMessageEl, "Please log in to submit a rating.", "error");
+        return;
+      }
+
       const cakeId = Number(document.getElementById("ratingCakeId").value);
+      const userId = currentUser.id;
+
+      if (!userId) {
+        setMessage(ratingMessageEl, "User ID not found in session. Please log in again.", "error");
+        return;
+      }
+
       const payload = {
         cakeId,
-        userId: Number(document.getElementById("ratingUserId").value),
+        userId: Number(userId),
         score: Number(document.getElementById("ratingScore").value),
         comment: document.getElementById("ratingComment").value
       };
@@ -823,8 +1250,227 @@
       if (currentModalCakeId === cakeId) {
         await openRatingsModal(cakeId);
       }
-      setMessage(ratingMessageEl, "Rating submitted", "success");
+      setMessage(ratingMessageEl, "Rating submitted successfully!", "success");
+      document.getElementById("ratingComment").value = "";
     }
+
+    if (adminCreateCakeForm) {
+      adminCreateCakeForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        setMessage(adminMessage, "", "");
+
+        const name = document.getElementById("adminCakeName").value.trim();
+        const category = document.getElementById("adminCakeCategory").value.trim();
+        const price = Number(document.getElementById("adminCakePrice").value);
+        const stock = Number(document.getElementById("adminCakeStock").value);
+        const description = document.getElementById("adminCakeDesc").value.trim();
+        const imageUrl = document.getElementById("adminCakeImageUrl").value.trim();
+
+        const response = await apiJson(API.cakeCreate, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, category, price, stock, description, imageUrl })
+        });
+
+        if (!response.ok) {
+          setMessage(adminMessage, response.error, "error");
+          return;
+        }
+
+        setMessage(adminMessage, `Cake "${name}" created successfully!`, "success");
+        adminCreateCakeForm.reset();
+        await fetchAndRenderCatalog();
+      });
+    }
+
+    async function openEditCakeModal(cakeId) {
+      setMessage(editCakeMessage, "", "");
+      const response = await apiJson(API.cakeById(cakeId));
+      if (!response.ok) {
+        alert("Failed to load cake details: " + response.error);
+        return;
+      }
+      const cake = response.data;
+      document.getElementById("editCakeId").value = cake.id;
+      document.getElementById("editCakeName").value = cake.name || "";
+      document.getElementById("editCakeCategory").value = cake.category || "";
+      document.getElementById("editCakePrice").value = cake.price || 0;
+      document.getElementById("editCakeStock").value = cake.stock || 0;
+      document.getElementById("editCakeDesc").value = cake.description || "";
+      document.getElementById("editCakeImageUrl").value = cake.imageUrl || "";
+
+      editCakeModal.classList.add("open");
+    }
+
+    function closeEditCakeModal() {
+      editCakeModal.classList.remove("open");
+      setMessage(editCakeMessage, "", "");
+    }
+
+    if (closeEditModalBtn) {
+      closeEditModalBtn.addEventListener("click", closeEditCakeModal);
+    }
+    if (editCakeModal) {
+      editCakeModal.addEventListener("click", (e) => {
+        if (e.target === editCakeModal) closeEditCakeModal();
+      });
+    }
+
+    if (adminEditCakeForm) {
+      adminEditCakeForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        setMessage(editCakeMessage, "", "");
+
+        const id = document.getElementById("editCakeId").value;
+        const name = document.getElementById("editCakeName").value.trim();
+        const category = document.getElementById("editCakeCategory").value.trim();
+        const price = Number(document.getElementById("editCakePrice").value);
+        const stock = Number(document.getElementById("editCakeStock").value);
+        const description = document.getElementById("editCakeDesc").value.trim();
+        const imageUrl = document.getElementById("editCakeImageUrl").value.trim();
+
+        const response = await apiJson(API.cakeUpdate(id), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, category, price, stock, description, imageUrl })
+        });
+
+        if (!response.ok) {
+          setMessage(editCakeMessage, response.error, "error");
+          return;
+        }
+
+        setMessage(editCakeMessage, `Cake updated successfully!`, "success");
+        setTimeout(() => {
+          closeEditCakeModal();
+          fetchAndRenderCatalog();
+        }, 800);
+      });
+    }
+
+    async function deleteCakeAction(cakeId) {
+      if (!confirm(`Are you sure you want to delete cake #${cakeId}?`)) return;
+
+      const response = await apiJson(API.cakeDelete(cakeId), {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        alert("Failed to delete cake: " + response.error);
+        return;
+      }
+
+      await fetchAndRenderCatalog();
+    }
+
+    tabLogin.addEventListener("click", () => {
+      tabLogin.classList.add("active-tab");
+      tabRegister.classList.remove("active-tab");
+      loginForm.style.display = "flex";
+      registerForm.style.display = "none";
+      setMessage(authMessageEl, "", "");
+    });
+
+    tabRegister.addEventListener("click", () => {
+      tabRegister.classList.add("active-tab");
+      tabLogin.classList.remove("active-tab");
+      registerForm.style.display = "flex";
+      loginForm.style.display = "none";
+      setMessage(authMessageEl, "", "");
+    });
+
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setMessage(authMessageEl, "", "");
+
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      if (!username) {
+        setMessage(authMessageEl, "Username is required.", "error");
+        return;
+      }
+      if (!password) {
+        setMessage(authMessageEl, "Password is required.", "error");
+        return;
+      }
+
+      const response = await apiJson(API.login, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (!response.ok) {
+        setMessage(authMessageEl, response.error, "error");
+        return;
+      }
+
+      const { token, id, email, role } = response.data;
+      saveAuthState(token, { id, username, email, role });
+      document.getElementById("loginPassword").value = "";
+      renderAuthState();
+      setMessage(authMessageEl, "Login successful!", "success");
+    });
+
+    registerForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setMessage(authMessageEl, "", "");
+
+      const username = document.getElementById("regUsername").value.trim();
+      const email = document.getElementById("regEmail").value.trim();
+      const password = document.getElementById("regPassword").value;
+
+      if (!username) {
+        setMessage(authMessageEl, "Username is required.", "error");
+        return;
+      }
+      if (!email) {
+        setMessage(authMessageEl, "Email is required.", "error");
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        setMessage(authMessageEl, "Please enter a valid email address.", "error");
+        return;
+      }
+      if (!password) {
+        setMessage(authMessageEl, "Password is required.", "error");
+        return;
+      }
+      if (password.length < 6) {
+        setMessage(authMessageEl, "Password must be at least 6 characters long.", "error");
+        return;
+      }
+
+      const response = await apiJson(API.register, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password })
+      });
+
+      if (!response.ok) {
+        setMessage(authMessageEl, response.error, "error");
+        return;
+      }
+
+      document.getElementById("regPassword").value = "";
+      setMessage(authMessageEl, `Registration successful for ${username}! Please log in.`, "success");
+      tabLogin.click();
+      document.getElementById("loginUsername").value = username;
+      document.getElementById("loginPassword").focus();
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      clearAuthState();
+      renderAuthState();
+      document.getElementById("loginUsername").value = "";
+      document.getElementById("loginPassword").value = "";
+      document.getElementById("regUsername").value = "";
+      document.getElementById("regEmail").value = "";
+      document.getElementById("regPassword").value = "";
+      setMessage(basketMessageEl, "Logged out successfully.", "success");
+    });
 
     document.getElementById("applyFilters").addEventListener("click", fetchAndRenderCatalog);
     document.getElementById("resetFilters").addEventListener("click", async () => {
@@ -846,9 +1492,12 @@
     window.updateBasketItem = updateBasketItem;
     window.removeBasketItem = removeBasketItem;
     window.openRatingsModal = openRatingsModal;
+    window.openEditCakeModal = openEditCakeModal;
+    window.deleteCakeAction = deleteCakeAction;
 
+    loadAuthState();
+    renderAuthState();
     fetchAndRenderCatalog();
-    fetchAndRenderBasket();
   </script>
 </body>
 </html>

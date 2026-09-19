@@ -20,6 +20,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long userId;
+
     private Double totalAmount;
 
     @Enumerated(EnumType.STRING)

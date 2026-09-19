@@ -6,29 +6,35 @@ This document details the architectural topology, service communication patterns
 
 ## 1. Overall System Architecture
 
-Cake Delight is constructed following an **event-driven microservices architecture** pattern. All client requests (Web Storefront UI) enter the platform through a unified **API Gateway**, which routes HTTP traffic to downstream business microservices. Asynchronous operations, such as order completion and email dispatch, are handled via **RabbitMQ** event messaging.
+Cake Delight is constructed following an **event-driven microservices architecture** pattern. All client requests (Web Storefront UI) enter the platform through a unified **API Gateway**, which validates JWT tokens and routes HTTP traffic to downstream business microservices. Asynchronous operations, such as order completion and email dispatch, are handled via **RabbitMQ** event messaging.
 
 ```mermaid
 flowchart TD
-    Client["Web Storefront / Browser"] -->|"HTTP / REST (Port 8080)"| Gateway["API Gateway (Port 8080)"]
+    Client["Web Storefront / Browser"] -->|"HTTP / REST (Port 8080)<br/>Authorization: Bearer JWT"| Gateway["API Gateway (Port 8080)<br/>JWT Validation & Header Injection"]
 
     subgraph Business_Microservices["Business Microservices"]
-        Gateway -->|"/api/catalog"| Catalog["Catalog Service (Port 8081)"]
-        Gateway -->|"/api/orders"| Order["Order Service (Port 8082)"]
-        Gateway -->|"/api/ratings"| Rating["Rating Service (Port 8083)"]
-        Gateway -->|"/api/notifications"| Notification["Notification Service (Port 8084)"]
+        Gateway -->|"/api/auth"| User["User Service (Port 8085)<br/>X-User-Id, X-User-Role"]
+        Gateway -->|"/api/catalog"| Catalog["Catalog Service (Port 8081)<br/>X-User-Id, X-User-Role"]
+        Gateway -->|"/api/orders"| Order["Order Service (Port 8082)<br/>X-User-Id, X-User-Role"]
+        Gateway -->|"/api/ratings"| Rating["Rating Service (Port 8083)<br/>X-User-Id, X-User-Role"]
+        Gateway -->|"/api/notifications"| Notification["Notification Service (Port 8084)<br/>X-User-Id, X-User-Role"]
+        Rating -.->|"Internal X-Internal-Secret lookup"| User
     end
 
-    subgraph Data_Tier["Data Tier"]
-        Catalog -->|"JDBC"| MySQL["MySQL 8.0 (Host: 3307, K8s: 3306)<br/>Databases: cake_catalog, cake_order, cake_rating, notification_db"]
+    subgraph Data_Tier["Data Tier (MySQL 8.0)"]
+        User -->|"JDBC"| MySQL["MySQL 8.0 (Host: 3307, K8s: 3306)<br/>Databases: user_db, cake_catalog, cake_order, cake_rating, notification_db"]
+        Catalog -->|"JDBC"| MySQL
         Order -->|"JDBC"| MySQL
         Rating -->|"JDBC"| MySQL
         Notification -->|"JDBC"| MySQL
     end
 
     subgraph Messaging_Infrastructure["Messaging Infrastructure"]
-        Order -->|"Publish OrderCompletedEvent"| RabbitMQ["RabbitMQ Broker (Port 5672 AMQP / 15672 UI)<br/>Exchange: order.events.exchange"]
-        RabbitMQ -->|"Consume order.completed.queue"| Notification
+        Order -->|"Publish OrderCompletedEvent"| RabbitMQ["RabbitMQ Broker (Port 5672 AMQP / 15672 UI)<br/>Exchange: cake-delight.exchange (Direct)"]
+        RabbitMQ -->|"Routing Key: order.completed"| Queue["Queue: notification.order.completed"]
+        Queue -->|"Consume Payload"| Notification
+        Notification -.->|"Failure / Retry Exhaustion"| DLX["DLX: cake-delight.dlx"]
+        DLX --> DLQ["DLQ: notification.order.completed.dlq"]
     end
 
     subgraph Email_Sink["Email Delivery Sink"]
@@ -42,85 +48,135 @@ flowchart TD
 
 | Service | Host / K8s Port | Database | Primary Responsibility |
 | :--- | :--- | :--- | :--- |
-| **API Gateway** | `8080` (NodePort `30080`) | None | Unified reverse-proxy entry point, request path routing, static UI hosting. |
-| **Catalog Service** | `8081` | `cake_catalog` | Manages cake catalog items, pricing, inventory stock, and filtering by category/name/price. |
-| **Order Service** | `8082` | `cake_order` | Manages shopping basket items, checkout processing, order records, and AMQP event publishing. |
+| **API Gateway** | `8080` (NodePort `30080`) | None | Unified entry point, path routing, JWT authentication filter, header injection & static UI hosting. |
+| **User Service** | `8085` | `user_db` | Manages user registration, login authentication, BCrypt password hashing, and JWT issuance. |
+| **Catalog Service** | `8081` | `cake_catalog` | Manages cake catalog items, pricing, inventory stock, filtering, and RBAC admin mutations. |
+| **Order Service** | `8082` | `cake_order` | Shopping basket, checkout processing, user-specific order history (`GET /api/orders`), order details & event publishing. |
 | **Rating Service** | `8083` | `cake_rating` | Independent service managing customer cake reviews and aggregate average scores. |
-| **Notification Service** | `8084` | `notification_db` | Consumes RabbitMQ order events, records notification audit logs, and sends emails via MailHog. |
-| **MySQL** | Docker: `3307:3306`<br/>K8s: `3306` | Shared Instance | Relational storage hosting 4 isolated databases (`cake_catalog`, `cake_order`, `cake_rating`, `notification_db`). |
-| **RabbitMQ** | `5672` (AMQP)<br/>`15672` (Web UI) | In-Memory / Disk | Asynchronous message broker handling topic exchanges (`order.events.exchange`) and durable queues (`order.completed.queue`). |
+| **Notification Service** | `8084` | `notification_db` | Consumes RabbitMQ order events, records notification audit logs, and dispatches emails via MailHog. |
+| **MySQL** | Docker: `3307:3306`<br/>K8s: `3306` | Shared Instance | Relational storage hosting 5 isolated databases (`cake_catalog`, `cake_order`, `cake_rating`, `notification_db`, `user_db`). |
+| **RabbitMQ** | `5672` (AMQP)<br/>`15672` (Web UI) | In-Memory / Disk | Asynchronous message broker handling direct exchanges (`cake-delight.exchange`), queues (`notification.order.completed`), and DLQ (`notification.order.completed.dlq`). |
 | **MailHog** | `1025` (SMTP)<br/>`8025` (Web UI) | In-Memory | Local SMTP sink for receiving, inspecting, and debugging notification emails. |
 
 ---
 
-## 3. Communication Patterns
+## 3. Communication & Security Patterns
 
-### A. UI to Backend Routing
-- The SPA Web Storefront static assets (`index.html`) are served directly by the **API Gateway** at `http://localhost:8080/`.
-- All API requests from the frontend use relative paths starting with `/api/`.
-- Spring Cloud Gateway filters rewrite routes dynamically:
-  - `/api/catalog/**` -> rewritten & forwarded to `http://catalog-service:8081/api/cakes/**`
-  - `/api/orders/basket` -> rewritten & forwarded to `http://order-service:8082/api/basket`
-  - `/api/orders/checkout` -> rewritten & forwarded to `http://order-service:8082/api/checkout`
-  - `/api/ratings/**` -> rewritten & forwarded to `http://rating-service:8083/api/ratings/**`
-  - `/api/notifications/**` -> forwarded to `http://notification-service:8084/api/notifications/**`
+### A. JWT Authentication & Identity Propagation Flow
+- The **API Gateway** serves as the security boundary for gateway-routed client traffic. The native User Service lookup endpoint is internal-only and protected by `X-Internal-Secret`.
+- Client requests present `Authorization: Bearer <JWT>`.
+- User Service hashes registration passwords with BCrypt and issues a signed JWT. The token subject is `username`; claims are `userId`, `email`, `role`, `iat`, and `exp` (default expiration: 24 hours).
+- `JwtAuthenticationFilter` validates token signature and expiration against the shared `JWT_SECRET`.
+- The Gateway strips unverified incoming identity headers and injects trusted downstream headers (`X-User-Id`, `X-User-Name`, `X-User-Role`).
+- Public gateway routes are registration, login, actuator endpoints, and `GET` catalog/rating reads. Other `/api` requests require a bearer token with `ROLE_USER` or `ROLE_ADMIN`; catalog mutations require `ROLE_ADMIN`.
 
-### B. Asynchronous Event Messaging
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Client / Storefront UI
+    participant Gateway as API Gateway (8080)
+    participant Auth as User Service (8085)
+    participant Microservice as Downstream Service (8081-8084)
+
+    Note over Client,Auth: Authentication Phase
+    Client->>Gateway: POST /api/auth/login (username, password)
+    Gateway->>Auth: Forward to /api/auth/login
+    Auth->>Auth: Verify BCrypt password in user_db
+    Auth-->>Client: Return Signed JWT Token (Bearer)
+
+    Note over Client,Microservice: Authenticated Request Phase
+    Client->>Gateway: GET /api/orders (Authorization: Bearer JWT)
+    Gateway->>Gateway: Validate JWT signature & claims
+    Gateway->>Gateway: Inject X-User-Id, X-User-Role, X-User-Name
+    Gateway->>Microservice: Forward request with trusted X-User-Id header
+    Microservice->>Microservice: Filter resources by X-User-Id / check RBAC
+    Microservice-->>Client: Return 200 OK (User-Specific Data)
+
+    Note over Rating,Auth: Rating username enrichment uses GET /api/users/{id} with X-Internal-Secret.
+```
+
+### B. User Order History Flow
+- Endpoint: `GET /api/orders`
+- Client sends `Authorization: Bearer <token>` without providing `userId` as a query parameter.
+- API Gateway validates the JWT token and forwards `X-User-Id: <userId>` to `order-service`.
+- `order-service` executes `orderRepository.findByUserIdOrderByOrderDateDesc(userId)` against `cake_order`.
+- Returns user-specific order list sorted newest first.
+- Individual order lookup (`GET /api/orders/{id}`) checks `order.getUserId().equals(userId)` or `ROLE_ADMIN`; returns `403 Forbidden` if requested by another user.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Authenticated User
+    participant Gateway as API Gateway
+    participant OrderService as Order Service
+    participant DB as MySQL (cake_order)
+
+    User->>Gateway: GET /api/orders (Bearer JWT)
+    Gateway->>Gateway: Extract userId from JWT
+    Gateway->>OrderService: GET /api/orders (Header: X-User-Id = userId)
+    OrderService->>DB: findByUserIdOrderByOrderDateDesc(userId)
+    DB-->>OrderService: Return Order Entities
+    OrderService-->>User: 200 OK [ Newest Order, Older Order ]
+```
+
+### C. Asynchronous Event Messaging & DLQ Flow
 - **Producer**: `order-service`
-- **Exchange**: `order.events.exchange` (Topic Exchange)
+- **Exchange**: `cake-delight.exchange` (**Direct Exchange**)
 - **Routing Key**: `order.completed`
-- **Queue**: `order.completed.queue`
+- **Primary Queue**: `notification.order.completed`
 - **Consumer**: `notification-service` (`OrderCompletedListener`)
-
-When checkout is executed, `order-service` saves the order state to `cake_order.orders`, clears the basket, and broadcasts `OrderCompletedEvent` to RabbitMQ. `notification-service` consumes the payload asynchronously from `order.completed.queue` without blocking the checkout HTTP response.
-
-### C. Rating Service Independence
-- `rating-service` manages cake reviews and average ratings independently on its own database `cake_rating`.
-- There is no direct HTTP, Feign client, or database coupling between `catalog-service` and `rating-service`. Frontend clients fetch catalog details from `catalog-service` and rating summary data from `rating-service` via API Gateway.
-
----
-
-## 4. End-to-End Order & Notification Flow
+- **Dead Letter Exchange (DLX)**: `cake-delight.dlx`
+- **Dead Letter Queue (DLQ)**: `notification.order.completed.dlq`
+- **Publisher retry**: Up to 3 attempts with a 500 ms delay; final failure is logged by `order-service`.
+- **Listener retry**: 3 attempts with 1 s initial interval, multiplier 2.0, and 5 s maximum interval.
+- **Failure distinction**: Handled SMTP errors are recorded as `FAILED`. Rejected or otherwise unhandled listener failures can be routed to the DLQ; a caught exception in `OrderCompletedListener` does not itself trigger DLQ routing.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Customer as Customer / Browser
     participant Gateway as API Gateway (8080)
-    participant Catalog as Catalog Service (8081)
     participant Order as Order Service (8082)
     participant Rabbit as RabbitMQ Broker (5672)
     participant Notif as Notification Service (8084)
     participant Mail as MailHog (8025 / 1025)
 
-    Customer->>Gateway: GET /api/catalog/cakes
-    Gateway->>Catalog: Forward request to /api/cakes
-    Catalog-->>Customer: Return Cake Catalog List
+    Customer->>Gateway: POST /api/orders/checkout (Bearer JWT)
+    Gateway->>Order: Forward to /api/checkout (Header: X-User-Id)
+    Order->>Order: Persist Order in cake_order
+    Order->>Rabbit: Publish OrderCompletedEvent to cake-delight.exchange (Routing Key: order.completed)
+    Order->>Order: Delete user's basket in checkout transaction
+    Order-->>Customer: Return CheckoutResponse (201 Created)
 
-    Customer->>Gateway: POST /api/orders/basket (cakeId: 1, quantity: 2)
-    Gateway->>Order: Forward to /api/basket
-    Order-->>Customer: Return BasketItemResponse (201 Created)
-
-    Customer->>Gateway: POST /api/orders/checkout
-    Gateway->>Order: Forward to /api/checkout
-    Order->>Order: Persist Order and Clear Basket
-    Order->>Rabbit: Publish OrderCompletedEvent to order.events.exchange (Routing Key: order.completed)
-    Order-->>Customer: Return CheckoutResponse (Order Placed)
-
-    Rabbit->>Notif: Deliver message from order.completed.queue
-    Notif->>Notif: Save notification record in notification_db
-    Notif->>Mail: Send SMTP Email (Port 1025)
-    Mail-->>Customer: View email in MailHog Web UI (Port 8025)
+    Rabbit->>Notif: Deliver from notification.order.completed queue
+    Notif->>Notif: Idempotency check via eventId in notification_db
+    alt SMTP Success
+        Notif->>Mail: Send SMTP Email (Port 1025)
+        Notif->>Notif: Set notification status = SENT
+    else SMTP Failure / Exception
+        Notif->>Notif: Set notification status = FAILED
+        Notif-->>Rabbit: Rejected/unhandled after listener retry
+        Rabbit->>Rabbit: Route to notification.order.completed.dlq via cake-delight.dlx
+    end
 ```
 
 ---
 
-## 5. Database Schema & Data Isolation
+## 4. Database Schema & Data Isolation
 
 Each microservice maintains strict database isolation within the shared MySQL server container:
 
 ```mermaid
 erDiagram
+    USERS {
+        bigint id PK
+        string username UK
+        string email UK
+        string password
+        string role
+        datetime created_at
+    }
+
     CAKES {
         bigint id PK
         string name
@@ -133,15 +189,16 @@ erDiagram
 
     BASKET_ITEMS {
         bigint id PK
+        bigint user_id
         bigint cake_id
         string cake_name
         double price_snapshot
         int quantity
-        double subtotal
     }
 
     ORDERS {
-        bigint order_id PK
+        bigint id PK
+        bigint user_id
         double total_amount
         string status
         datetime order_date
@@ -152,7 +209,7 @@ erDiagram
         bigint order_id FK
         bigint cake_id
         string cake_name
-        double price
+        double price_snapshot
         int quantity
     }
 
@@ -181,16 +238,19 @@ erDiagram
 
 ---
 
-## 6. Deployment Topologies
+## 5. Deployment Topologies
 
 ### Docker Compose View
-All 8 containers run within a single isolated bridge network `cake-network`. Service discovery relies on Docker container names (`catalog-service`, `order-service`, `rating-service`, `notification-service`, `cake-mysql`, `rabbitmq`, `mailhog`).
+All **9 containers** run within a single isolated bridge network `cake-network`. Service discovery relies on Docker container names (`api-gateway`, `user-service`, `catalog-service`, `order-service`, `rating-service`, `notification-service`, `cake-mysql`, `rabbitmq`, `mailhog`). The host exposes the gateway on `8080`, MySQL on `3307`, RabbitMQ on `5672`/`15672`, and MailHog on `1025`/`8025`; the application services remain internal to the Compose network.
 - **MySQL Host Port Mapping**: `3307:3306`
 - **RabbitMQ Host Port Mappings**: AMQP `5672:5672`, Management UI `15672:15672`
 - **MailHog Host Port Mappings**: SMTP `1025:1025`, Web UI `8025:8025`
 
 ### Kubernetes View
 Deployed in namespace `cake-delight`:
-- **API Gateway**: Deployed as a `NodePort` service mapping node port `30080` to target port `8080`.
-- **Microservices & Infrastructure**: Deployed as individual `Deployment` resources paired with `ClusterIP` `Service` definitions (`mysql:3306`, `rabbitmq:5672`, `mailhog:1025/8025`).
-- **Config & Secrets**: Managed globally via `cake-delight-config` ConfigMap and `cake-delight-secrets` Secret.
+- **Workload Summary**: 9 Deployments and 9 Services, 11 desired pods total: two each for `api-gateway` and `user-service`, one each for the remaining seven workloads.
+- **Multi-Replica Deployments**:
+  - `api-gateway`: **2 Replicas** (NodePort `30080` -> Target `8080`)
+  - `user-service`: **2 Replicas** (ClusterIP `8085`)
+- **Single-Replica Deployments**: `catalog-service`, `order-service`, `rating-service`, `notification-service`, `mysql`, `rabbitmq`, `mailhog` (**1 Replica each**).
+- **Config & Secrets**: Managed via `cake-delight-config` ConfigMap and `cake-delight-secrets` Secret in namespace `cake-delight`. MySQL uses `mysql-pvc` with a 2Gi request; the gateway is a NodePort on `30080`, while the other services are ClusterIP.

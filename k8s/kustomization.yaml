@@ -12,4 +12,5 @@ resources:
   - order-service.yaml
   - rating-service.yaml
   - notification-service.yaml
+  - user-service.yaml
   - api-gateway.yaml
