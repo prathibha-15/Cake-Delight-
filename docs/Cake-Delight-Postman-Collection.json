@@ -1,128 +1,118 @@
 {
   "info": {
     "name": "Cake Delight API Collection",
-    "description": "End-to-End Postman Collection for Cake Delight Microservices",
+    "description": "Current gateway API flow for Cake Delight. Register or log in first; protected requests use the token variables populated by the login requests.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Catalog - Get All Cakes",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/catalog/cakes",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "catalog", "cakes"]
-        }
-      }
-    },
-    {
-      "name": "Catalog - Filter Cakes",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/catalog/cakes?category=Birthday",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "catalog", "cakes"],
-          "query": [
-            { "key": "category", "value": "Birthday" }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Order - Add to Basket",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"cakeId\": 1,\n  \"quantity\": 2\n}"
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
         },
-        "url": {
-          "raw": "{{baseUrl}}/api/orders/basket",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "orders", "basket"]
-        }
-      }
-    },
-    {
-      "name": "Order - Get Basket",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/orders/basket",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "orders", "basket"]
-        }
-      }
-    },
-    {
-      "name": "Order - Checkout",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/api/orders/checkout",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "orders", "checkout"]
-        }
-      }
-    },
-    {
-      "name": "Rating - Submit Rating",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"cakeId\": 1,\n  \"userId\": 101,\n  \"score\": 5,\n  \"comment\": \"Superb cake!\"\n}"
+        {
+          "name": "Login User",
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": ["const body = pm.response.json();", "pm.collectionVariables.set('token', body.token);", "pm.collectionVariables.set('userId', body.id);"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
         },
-        "url": {
-          "raw": "{{baseUrl}}/api/ratings",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "ratings"]
-        }
-      }
+        {
+          "name": "Login Admin",
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": ["const body = pm.response.json();", "pm.collectionVariables.set('adminToken', body.token);", "pm.collectionVariables.set('adminId', body.id);"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        { "name": "Update Cake (Admin)", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated Postman Cake\",\n  \"description\": \"Updated API test cake\",\n  \"category\": \"Testing\",\n  \"price\": 125.0,\n  \"stock\": 4,\n  \"imageUrl\": \"https://example.com/updated-cake.jpg\"\n}" }, "url": "{{baseUrl}}/api/catalog/cakes/{{cakeId}}" } },
+        { "name": "Delete Cake (Admin)", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/catalog/cakes/{{cakeId}}" } }
+      ]
     },
     {
-      "name": "Rating - Get Average Rating",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/ratings/cakes/1/average",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "ratings", "cakes", "1", "average"]
+      "name": "Catalog",
+      "item": [
+        { "name": "Get All Cakes", "request": { "method": "GET", "url": "{{baseUrl}}/api/catalog/cakes" } },
+        { "name": "Filter Cakes", "request": { "method": "GET", "url": "{{baseUrl}}/api/catalog/cakes?category=Birthday&name=&minPrice=&maxPrice=" } },
+        { "name": "Get Cake", "request": { "method": "GET", "url": "{{baseUrl}}/api/catalog/cakes/1" } },
+        {
+          "name": "Create Cake (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Cake\",\n  \"description\": \"Temporary API test cake\",\n  \"category\": \"Testing\",\n  \"price\": 100.0,\n  \"stock\": 5,\n  \"imageUrl\": \"https://example.com/cake.jpg\"\n}" },
+            "url": "{{baseUrl}}/api/catalog/cakes"
+          }
         }
-      }
+      ]
     },
     {
-      "name": "Notification - Get Order Notifications",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/notifications/1",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "notifications", "1"]
-        }
-      }
+      "name": "Basket and Orders",
+      "item": [
+        { "name": "Add to Basket", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"cakeId\": 1,\n  \"quantity\": 2\n}" }, "url": "{{baseUrl}}/api/orders/basket" } },
+        { "name": "Get Basket", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/orders/basket" } },
+        { "name": "Update Basket Item", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"cakeId\": 1,\n  \"quantity\": 1\n}" }, "url": "{{baseUrl}}/api/orders/basket/{{basketItemId}}" } },
+        { "name": "Remove Basket Item", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/orders/basket/{{basketItemId}}" } },
+        { "name": "Checkout", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/orders/checkout" } },
+        { "name": "Get Order History", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/orders" } },
+        { "name": "Get Order By ID", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/orders/{{orderId}}" } }
+      ]
+    },
+    {
+      "name": "Ratings",
+      "item": [
+        { "name": "Submit Rating", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"cakeId\": 1,\n  \"userId\": {{userId}},\n  \"score\": 5,\n  \"comment\": \"Superb cake!\"\n}" }, "url": "{{baseUrl}}/api/ratings" } },
+        { "name": "Get Cake Ratings", "request": { "method": "GET", "url": "{{baseUrl}}/api/ratings/cakes/1" } },
+        { "name": "Get Average Rating", "request": { "method": "GET", "url": "{{baseUrl}}/api/ratings/cakes/1/average" } }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        { "name": "Get Order Notifications", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/notifications/{{orderId}}" } }
+      ]
+    },
+    {
+      "name": "Internal User Lookup",
+      "description": "The User Service does not expose this endpoint through the gateway. Use a local port-forward or direct service port and provide the shared internal secret.",
+      "item": [
+        { "name": "Get User By ID", "request": { "method": "GET", "header": [{ "key": "X-Internal-Secret", "value": "{{internalSecret}}" }], "url": "{{userServiceUrl}}/api/users/{{userId}}" } }
+      ]
     }
   ],
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8080"
-    }
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "userServiceUrl", "value": "http://localhost:8085" },
+    { "key": "username", "value": "postman-user" },
+    { "key": "email", "value": "postman-user@example.com" },
+    { "key": "password", "value": "password123" },
+    { "key": "adminUsername", "value": "admin" },
+    { "key": "adminPassword", "value": "Admin@12345" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "userId", "value": "1" },
+    { "key": "adminId", "value": "1" },
+    { "key": "cakeId", "value": "1" },
+    { "key": "basketItemId", "value": "1" },
+    { "key": "orderId", "value": "1" },
+    { "key": "internalSecret", "value": "c2VjcmV0LWtleS1jYWtlLWRlbGlnaHQtdjItc3VwZXItc2VjcmV0LXNlY3JldC1rZXk=" }
   ]
 }

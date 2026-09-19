@@ -18,6 +18,7 @@ flowchart TD
         Gateway -->|"/api/orders"| Order["Order Service (Port 8082)<br/>X-User-Id, X-User-Role"]
         Gateway -->|"/api/ratings"| Rating["Rating Service (Port 8083)<br/>X-User-Id, X-User-Role"]
         Gateway -->|"/api/notifications"| Notification["Notification Service (Port 8084)<br/>X-User-Id, X-User-Role"]
+        Rating -.->|"Internal X-Internal-Secret lookup"| User
     end
 
     subgraph Data_Tier["Data Tier (MySQL 8.0)"]
@@ -62,10 +63,12 @@ flowchart TD
 ## 3. Communication & Security Patterns
 
 ### A. JWT Authentication & Identity Propagation Flow
-- The **API Gateway** serves as the security boundary for the entire microservice ecosystem.
+- The **API Gateway** serves as the security boundary for gateway-routed client traffic. The native User Service lookup endpoint is internal-only and protected by `X-Internal-Secret`.
 - Client requests present `Authorization: Bearer <JWT>`.
+- User Service hashes registration passwords with BCrypt and issues a signed JWT. The token subject is `username`; claims are `userId`, `email`, `role`, `iat`, and `exp` (default expiration: 24 hours).
 - `JwtAuthenticationFilter` validates token signature and expiration against the shared `JWT_SECRET`.
 - The Gateway strips unverified incoming identity headers and injects trusted downstream headers (`X-User-Id`, `X-User-Name`, `X-User-Role`).
+- Public gateway routes are registration, login, actuator endpoints, and `GET` catalog/rating reads. Other `/api` requests require a bearer token with `ROLE_USER` or `ROLE_ADMIN`; catalog mutations require `ROLE_ADMIN`.
 
 ```mermaid
 sequenceDiagram
@@ -88,6 +91,8 @@ sequenceDiagram
     Gateway->>Microservice: Forward request with trusted X-User-Id header
     Microservice->>Microservice: Filter resources by X-User-Id / check RBAC
     Microservice-->>Client: Return 200 OK (User-Specific Data)
+
+    Note over Rating,Auth: Rating username enrichment uses GET /api/users/{id} with X-Internal-Secret.
 ```
 
 ### B. User Order History Flow
@@ -122,6 +127,9 @@ sequenceDiagram
 - **Consumer**: `notification-service` (`OrderCompletedListener`)
 - **Dead Letter Exchange (DLX)**: `cake-delight.dlx`
 - **Dead Letter Queue (DLQ)**: `notification.order.completed.dlq`
+- **Publisher retry**: Up to 3 attempts with a 500 ms delay; final failure is logged by `order-service`.
+- **Listener retry**: 3 attempts with 1 s initial interval, multiplier 2.0, and 5 s maximum interval.
+- **Failure distinction**: Handled SMTP errors are recorded as `FAILED`. Rejected or otherwise unhandled listener failures can be routed to the DLQ; a caught exception in `OrderCompletedListener` does not itself trigger DLQ routing.
 
 ```mermaid
 sequenceDiagram
@@ -135,8 +143,9 @@ sequenceDiagram
 
     Customer->>Gateway: POST /api/orders/checkout (Bearer JWT)
     Gateway->>Order: Forward to /api/checkout (Header: X-User-Id)
-    Order->>Order: Persist Order in cake_order & clear basket
+    Order->>Order: Persist Order in cake_order
     Order->>Rabbit: Publish OrderCompletedEvent to cake-delight.exchange (Routing Key: order.completed)
+    Order->>Order: Delete user's basket in checkout transaction
     Order-->>Customer: Return CheckoutResponse (201 Created)
 
     Rabbit->>Notif: Deliver from notification.order.completed queue
@@ -146,8 +155,8 @@ sequenceDiagram
         Notif->>Notif: Set notification status = SENT
     else SMTP Failure / Exception
         Notif->>Notif: Set notification status = FAILED
-        Notif-->>Rabbit: Reject message (triggers DLX cake-delight.dlx)
-        Rabbit->>Rabbit: Route to notification.order.completed.dlq
+        Notif-->>Rabbit: Rejected/unhandled after listener retry
+        Rabbit->>Rabbit: Route to notification.order.completed.dlq via cake-delight.dlx
     end
 ```
 
@@ -232,16 +241,16 @@ erDiagram
 ## 5. Deployment Topologies
 
 ### Docker Compose View
-All **9 containers** run within a single isolated bridge network `cake-network`. Service discovery relies on Docker container names (`api-gateway`, `user-service`, `catalog-service`, `order-service`, `rating-service`, `notification-service`, `cake-mysql`, `rabbitmq`, `mailhog`).
+All **9 containers** run within a single isolated bridge network `cake-network`. Service discovery relies on Docker container names (`api-gateway`, `user-service`, `catalog-service`, `order-service`, `rating-service`, `notification-service`, `cake-mysql`, `rabbitmq`, `mailhog`). The host exposes the gateway on `8080`, MySQL on `3307`, RabbitMQ on `5672`/`15672`, and MailHog on `1025`/`8025`; the application services remain internal to the Compose network.
 - **MySQL Host Port Mapping**: `3307:3306`
 - **RabbitMQ Host Port Mappings**: AMQP `5672:5672`, Management UI `15672:15672`
 - **MailHog Host Port Mappings**: SMTP `1025:1025`, Web UI `8025:8025`
 
 ### Kubernetes View
 Deployed in namespace `cake-delight`:
-- **Workload Summary**: 9 Deployments / Services, 11 Pods total.
+- **Workload Summary**: 9 Deployments and 9 Services, 11 desired pods total: two each for `api-gateway` and `user-service`, one each for the remaining seven workloads.
 - **Multi-Replica Deployments**:
   - `api-gateway`: **2 Replicas** (NodePort `30080` -> Target `8080`)
   - `user-service`: **2 Replicas** (ClusterIP `8085`)
 - **Single-Replica Deployments**: `catalog-service`, `order-service`, `rating-service`, `notification-service`, `mysql`, `rabbitmq`, `mailhog` (**1 Replica each**).
-- **Config & Secrets**: Managed globally via `cake-delight-config` ConfigMap and `cake-delight-secrets` Secret.
+- **Config & Secrets**: Managed via `cake-delight-config` ConfigMap and `cake-delight-secrets` Secret in namespace `cake-delight`. MySQL uses `mysql-pvc` with a 2Gi request; the gateway is a NodePort on `30080`, while the other services are ClusterIP.

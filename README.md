@@ -41,7 +41,7 @@ For detailed architectural sequence flows, security identity propagation, and ER
 - **Persistence**: Spring Data JPA / Hibernate (`ddl-auto=validate`), MySQL 8.0, Flyway Schema Migrations
 - **Messaging**: RabbitMQ (AMQP 0-9-1 Direct Exchange, DLX/DLQ)
 - **Email Sink**: MailHog (SMTP)
-- **API Specs**: SpringDoc OpenAPI (Swagger UI)
+- **API Specs**: SpringDoc OpenAPI 2.8.13 (Swagger UI for Catalog, Order, Rating, Notification, and User services)
 - **Frontend**: Vanilla HTML5, CSS3, JavaScript (ES6+ fetch API, JWT session management)
 - **Containerization & Orchestration**: Docker, Docker Compose (9 containers), Kubernetes (Minikube, Kustomize)
 
@@ -56,8 +56,9 @@ For detailed architectural sequence flows, security identity propagation, and ER
 
 The platform enforces a centralized Gateway authentication model with zero-trust downstream headers:
 
-- **User Registration**: `POST /api/auth/register` (Creates user entry in `user_db` with BCrypt password hashing).
-- **User Login**: `POST /api/auth/login` (Authenticates credentials and returns a signed JWT token containing `id`, `username`, and `role`).
+- **User Registration**: `POST /api/auth/register` (Creates a `ROLE_USER` entry in `user_db` and stores the password with BCrypt hashing).
+- **User Login**: `POST /api/auth/login` (Authenticates credentials and returns a signed JWT token plus user details).
+- **JWT Claims**: The token subject is `username`; custom claims are `userId`, `email`, and `role`. It also contains `iat` and `exp`; the default expiration is 24 hours.
 - **Gateway Identity Verification**: API Gateway's `JwtAuthenticationFilter` intercepts all incoming requests, validates the JWT signature and expiration, and extracts the user identity claims.
 - **Identity Propagation**: The Gateway injects verified headers (`X-User-Id`, `X-User-Name`, `X-User-Role`) into requests forwarded to downstream microservices. Client-supplied identity headers are stripped/overwritten by the Gateway to prevent header spoofing.
 - **Role-Based Access Control (RBAC)**:
@@ -65,6 +66,7 @@ The platform enforces a centralized Gateway authentication model with zero-trust
   - `ROLE_USER`: Access to normal shopping, basket, checkout, order history, ratings, and notifications.
   - **Unauthorized Access (401)**: Returned when accessing protected endpoints without a valid JWT.
   - **Forbidden Access (403)**: Returned when a user attempts operations without sufficient role permissions (e.g. non-admin attempting cake creation) or accesses resources belonging to another user.
+- **Internal service authentication**: Downstream services require the shared `X-Internal-Secret` header. The gateway removes client-supplied identity and internal-secret headers before adding trusted values. The User Service lookup endpoint is internal-only and is not routed through the gateway.
 
 ---
 
@@ -76,6 +78,18 @@ The platform enforces a centralized Gateway authentication model with zero-trust
   - Returns `200 OK` with an empty array `[]` if the user has no orders.
 - **Individual Order Ownership**: `GET /api/orders/{id}`
   - Enforces strict ownership checks. If User A attempts to request User B's order ID (`GET /api/orders/{UserBOrderId}`), the Order Service rejects the request with **HTTP 403 Forbidden**.
+
+## 👤 User Service API
+
+These endpoints are exposed to clients through the API Gateway. The native User Service also exposes the internal lookup endpoint on port `8085`; it requires `X-Internal-Secret` and returns only a user ID and username.
+
+| Method | Gateway path | Authentication | Request | Response |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Public gateway route | `{ "username": "alice", "email": "alice@example.com", "password": "password123" }` | `201` with `id`, `username`, `email`, `role`, `createdAt` |
+| `POST` | `/api/auth/login` | Public gateway route | `{ "username": "alice", "password": "password123" }` | `200` with `token`, `type`, `id`, `username`, `email`, `role` |
+| `GET` | `/api/users/{id}` on User Service only | `X-Internal-Secret` required; not gateway-routed | Path variable `id` | `200` with `{ "id", "username" }`, or `404` |
+
+Registration validation requires a username of 3-50 characters, a valid email of at most 100 characters, and a password of 6-100 characters. Duplicate users return `409`; validation errors return `400`; invalid login credentials return `401`.
 
 ---
 
@@ -123,6 +137,8 @@ Each backend microservice includes built-in SpringDoc Swagger UI documentation a
 | **Notification Service** | [http://localhost:8084/swagger-ui/index.html](http://localhost:8084/swagger-ui/index.html) | [http://localhost:8084/v3/api-docs](http://localhost:8084/v3/api-docs) |
 | **User Service** | [http://localhost:8085/swagger-ui/index.html](http://localhost:8085/swagger-ui/index.html) | [http://localhost:8085/v3/api-docs](http://localhost:8085/v3/api-docs) |
 
+The application service ports are internal in the supplied Docker Compose file. Use a local port mapping or `docker compose exec`/Kubernetes port-forward to reach them. Native service routes, including Swagger, are protected by `X-Internal-Secret`; the gateway does not proxy these Swagger paths.
+
 ---
 
 ## 📡 API Endpoints Reference
@@ -150,9 +166,9 @@ All client API requests should be routed through the **API Gateway** on port `80
 - `GET http://localhost:8080/api/orders/{id}` - Get order status by order ID (*Requires ownership or ROLE_ADMIN; 403 Forbidden otherwise*).
 
 ### ⭐ Rating API
-- `POST http://localhost:8080/api/ratings` - Submit a cake review (`{"cakeId": 1, "userId": 1, "score": 5, "comment": "Delicious!"}`) (*Requires Auth*).
-- `GET http://localhost:8080/api/ratings/cakes/{cakeId}` - Get all customer reviews for a cake.
-- `GET http://localhost:8080/api/ratings/cakes/{cakeId}/average` - Get average score & total review count.
+- `POST http://localhost:8080/api/ratings` - Submit a cake review (`{"cakeId": 1, "userId": 1, "score": 5, "comment": "Delicious!"}`) (*Requires Auth*; the current request contract includes `userId` and validates `score` from 1 to 5).
+- `GET http://localhost:8080/api/ratings/cakes/{cakeId}` - Get all customer reviews for a cake. Each rating includes `id`, `cakeId`, `userId`, `score`, `comment`, `createdAt`, and resolved `username` (falling back to `Customer` if lookup fails).
+- `GET http://localhost:8080/api/ratings/cakes/{cakeId}/average` - Get `cakeId`, `average`, and `count`; returns `404` when no ratings exist.
 
 ### 🔔 Notification API
 - `GET http://localhost:8080/api/notifications/{orderId}` - Get notification records for a specific order (*Requires Auth*).
@@ -267,10 +283,10 @@ Cake Delight uses an asynchronous AMQP event publication pattern for order compl
 
 ### Order-to-Notification Flow:
 1. User executes `POST /api/orders/checkout`.
-2. `order-service` saves the order in `cake_order`, clears the basket, and broadcasts `OrderCompletedEvent` to `cake-delight.exchange` with routing key `order.completed`.
+2. `order-service` saves the order in `cake_order`, publishes `OrderCompletedEvent` to `cake-delight.exchange` with routing key `order.completed`, and then deletes the user's basket within the checkout transaction.
 3. `notification-service` (`OrderCompletedListener`) consumes the message asynchronously from `notification.order.completed`.
 4. Consumer verifies idempotency using `eventId` (UUID). If new, it records a `PENDING` entry in `notification_db`, transmits an email via SMTP to MailHog, and updates the notification status to `SENT`.
-5. If MailHog/SMTP is unreachable, the exception is caught and recorded as status `FAILED` in `notification_db`. Unhandled listener exceptions trigger Spring AMQP retry handling and dead-letter routing to `notification.order.completed.dlq`.
+5. The order publisher retries a failed publish up to three times with a 500 ms delay, then logs the failure without throwing it back to the checkout caller. Notification listener processing is configured for three attempts with 1 s initial delay, 2x multiplier, and 5 s maximum interval. A message is routed to the DLQ only when it is rejected or remains unhandled after listener processing; handled SMTP failures are recorded as `FAILED`.
 
 ---
 
@@ -298,20 +314,17 @@ The frontend is a lightweight Single-Page Application (SPA) built using Vanilla 
 - **JWT Session Restoration**: Automatically restores user sessions from `localStorage` token on page reload.
 - **Authentication**: Modal dialogs for Login and Registration.
 - **Order History View**: Displays the logged-in user's historic orders (Order ID, Status, Total Amount, Date/Time, Items, Notification Status), sorted newest first.
-- **Ratings & Reviews**: Renders ratings with reviewer names (`👤 <username>` for logged-in user, `👤 Customer` for others).
+- **Ratings & Reviews**: Renders ratings with the backend-resolved reviewer name and uses `Customer` as the backend fallback when a username cannot be resolved.
 - **Admin UI**: Displays the Cake Management section exclusively for users with `ROLE_ADMIN`, providing controls to add, edit, or delete cakes.
 
 ---
 
-## 🛡️ Fault Tolerance & Resilience Scenarios
+## 🛡️ Failure Handling Notes
 
-The system has been verified under isolated failure conditions:
-
-1. **Notification Service Offline**: Orders are successfully processed by `order-service`. Messages accumulate safely in durable queue `notification.order.completed` until `notification-service` recovers.
-2. **MailHog Service Offline**: `notification-service` processes the order event, logs a `FAILED` notification record in `notification_db`, and prevents transaction rollback for order placement.
-3. **Catalog Service Offline**: Gateway returns `503 Service Unavailable` for catalog queries; existing basket and order history remain accessible.
-4. **RabbitMQ Broker Offline**: Order placement falls back gracefully; database commits succeed and background message retry policies kick in once RabbitMQ reconnects.
-5. **Recovery Verification**: Post-restoration tests confirm 100% message delivery and clean state reconciliation without duplicate processing.
+- Order creation and basket deletion are handled by the Order Service transaction. RabbitMQ publication is attempted with three local retries; if all fail, the failure is logged and the checkout response is not changed by the publisher.
+- The durable notification queue preserves messages while the Notification Service is unavailable.
+- Notification processing records `PENDING`, `SENT`, or `FAILED` in `notification_db`. SMTP failures are handled and recorded as `FAILED`; they are not described as guaranteed DLQ events.
+- Notification listener retries are configured for three attempts. Rejected or otherwise unhandled messages can be routed through `cake-delight.dlx` to `notification.order.completed.dlq`.
 
 ---
 
@@ -322,7 +335,7 @@ This section provides complete instructions for deploying **Cake Delight** on a 
 ### 📋 Kubernetes Topology Summary
 
 - **Namespace**: `cake-delight`
-- **Deployments & Services (9 Workloads, 11 Pods Total)**:
+- **Workloads**: 9 Deployments and 9 Kubernetes Services, with 11 desired pods because `api-gateway` and `user-service` each run 2 replicas and the other 7 workloads run 1 replica:
   - `api-gateway`: **2 Replicas** (NodePort `30080` -> Target `8080`)
   - `user-service`: **2 Replicas** (ClusterIP `8085`)
   - `catalog-service`: **1 Replica** (ClusterIP `8081`)
@@ -332,7 +345,7 @@ This section provides complete instructions for deploying **Cake Delight** on a 
   - `mysql`: **1 Replica** (ClusterIP `3306`, PVC `mysql-pvc` 2Gi)
   - `rabbitmq`: **1 Replica** (ClusterIP `5672` / `15672`)
   - `mailhog`: **1 Replica** (ClusterIP `1025` / `8025`)
-- **Probes**: Configured with `startupProbe` (up to 10 min JVM warm-up window for MySQL initialization), `readinessProbe`, and `livenessProbe`.
+- **Probes**: Application deployments use HTTP startup/readiness/liveness probes; RabbitMQ and MySQL use TCP probes; MailHog uses an HTTP readiness probe and TCP liveness probe.
 
 ---
 
@@ -371,7 +384,7 @@ kubectl apply -k k8s/
 ```powershell
 kubectl get pods -n cake-delight
 ```
-Wait until all **11 pods** transition to **`1/1 Running`**.
+Wait until the expected **11 pods** are ready (`api-gateway` and `user-service` have two pods each).
 
 ---
 
@@ -391,3 +404,9 @@ Kubernetes ClusterIP services require port-forwarding to be accessed from host b
    ```powershell
    kubectl port-forward service/rabbitmq 15672:15672 -n cake-delight
    ```
+
+## 🧪 Testing
+
+- Run the authenticated Docker-backed flow from the repository root with `test-flow.bat` on Windows or `./test-flow.sh` on Bash-compatible environments. The PowerShell implementation is in `test-flow.ps1`.
+- The flow covers registration, login/JWT extraction, catalog access and filtering, basket operations, checkout, empty-basket rejection, order history, rating submission/list retrieval, unauthenticated rejection, normal-user RBAC rejection, admin login, admin catalog CRUD, and notification lookup.
+- The Postman collection is [docs/Cake-Delight-Postman-Collection.json](docs/Cake-Delight-Postman-Collection.json). Set `baseUrl` to `http://localhost:8080`, register/login first, and use the returned bearer token for protected requests.
