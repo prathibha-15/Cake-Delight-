@@ -27,7 +27,8 @@ public class RatingMapper {
                 rating.getUserId(),
                 rating.getScore(),
                 rating.getComment(),
-                rating.getCreatedAt()
+                rating.getCreatedAt(),
+                null
         );
     }
 }

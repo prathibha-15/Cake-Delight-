@@ -17,4 +17,5 @@ public class RatingResponse {
     private Integer score;
     private String comment;
     private LocalDateTime createdAt;
+    private String username;
 }

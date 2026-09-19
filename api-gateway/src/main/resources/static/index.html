@@ -827,6 +827,8 @@
 
       if (lastCatalog && lastCatalog.length) {
         renderCatalog(lastCatalog);
+        // Re-rendered cards start at "Loading rating..."; refresh them so no manual refresh is needed.
+        Promise.all(lastCatalog.map((cake) => refreshCakeAverage(cake.id)));
       }
     }
 
@@ -1002,9 +1004,9 @@
 
     function renderBasketPanel(basket) {
       const items = basket.items || [];
-      basketSummaryEl.innerHTML = `<div class="basket-total">Basket total: ${formatRupees(basket.totalAmount || 0)}</div>`;
 
       if (!authToken) {
+        basketSummaryEl.innerHTML = "";
         basketEl.innerHTML = `<div class="muted">Please log in to view and manage your basket.</div>`;
         checkoutBtn.disabled = true;
         checkoutBtn.classList.add("secondary");
@@ -1013,6 +1015,7 @@
       }
 
       if (!items.length) {
+        basketSummaryEl.innerHTML = "";
         basketEl.innerHTML = `<div class="muted">Your basket is empty.</div>`;
         checkoutBtn.disabled = true;
         checkoutBtn.classList.add("secondary");
@@ -1020,6 +1023,7 @@
         return;
       }
 
+      basketSummaryEl.innerHTML = `<div class="basket-total">Basket total: ${formatRupees(basket.totalAmount || 0)}</div>`;
       checkoutBtn.disabled = false;
       checkoutBtn.classList.add("primary");
       checkoutBtn.classList.remove("secondary");
@@ -1038,11 +1042,14 @@
 
     async function fetchAndRenderBasket() {
       if (!authToken) {
-        renderBasketPanel({ items: [], totalAmount: 0 });
+        currentBasket = { items: [], totalAmount: 0 };
+        renderBasketPanel(currentBasket);
         return;
       }
       const response = await apiJson(API.basket);
       if (!response.ok) {
+        currentBasket = { items: [], totalAmount: 0 };
+        renderBasketPanel(currentBasket);
         setMessage(basketMessageEl, response.error, "error");
         return;
       }
@@ -1148,7 +1155,8 @@
         "success"
       );
 
-      saveUserOrderId(currentUser.id, order.orderId);
+      // Re-fetch authoritative basket/order state from the backend instead of
+      // patching local state, so the UI never shows stale pre-checkout data.
       await fetchAndRenderBasket();
       await loadUserOrderHistory();
     }
@@ -1182,8 +1190,7 @@
       const reviews = Array.isArray(listRes.data) ? listRes.data : [];
       ratingsModalListEl.innerHTML = reviews.length
         ? reviews.map((review) => {
-            const isCurrentUser = currentUser && (Number(review.userId) === Number(currentUser.id));
-            const userLabel = isCurrentUser ? `👤 ${currentUser.username}` : `👤 Customer`;
+            const userLabel = `👤 ${review.username || "Customer"}`;
             const dateStr = review.createdAt ? new Date(review.createdAt).toLocaleDateString() : "";
             return `
               <div class="review-item">

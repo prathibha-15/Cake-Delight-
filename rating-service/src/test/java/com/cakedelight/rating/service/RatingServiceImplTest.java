@@ -1,5 +1,6 @@
 package com.cakedelight.rating.service;
 
+import com.cakedelight.rating.client.UserServiceClient;
 import com.cakedelight.rating.dto.AverageRatingResponse;
 import com.cakedelight.rating.dto.RatingRequest;
 import com.cakedelight.rating.dto.RatingResponse;
@@ -31,6 +32,9 @@ class RatingServiceImplTest {
     @Mock
     private RatingMapper ratingMapper;
 
+    @Mock
+    private UserServiceClient userServiceClient;
+
     @InjectMocks
     private RatingServiceImpl ratingService;
 
@@ -49,7 +53,7 @@ class RatingServiceImplTest {
         sampleRating.setCreatedAt(LocalDateTime.now());
 
         sampleRequest = new RatingRequest(10L, 101L, 5, "Delicious!");
-        sampleResponse = new RatingResponse(1L, 10L, 101L, 5, "Delicious!", LocalDateTime.now());
+        sampleResponse = new RatingResponse(1L, 10L, 101L, 5, "Delicious!", LocalDateTime.now(), null);
     }
 
     @Test
@@ -57,12 +61,14 @@ class RatingServiceImplTest {
         when(ratingMapper.toEntity(sampleRequest)).thenReturn(sampleRating);
         when(ratingRepository.save(sampleRating)).thenReturn(sampleRating);
         when(ratingMapper.toResponse(sampleRating)).thenReturn(sampleResponse);
+        when(userServiceClient.getUsername(101L)).thenReturn("testUser");
 
         RatingResponse response = ratingService.createRating(sampleRequest);
 
         assertNotNull(response);
         assertEquals(5, response.getScore());
         assertEquals("Delicious!", response.getComment());
+        assertEquals("testUser", response.getUsername());
         verify(ratingRepository).save(sampleRating);
     }
 
@@ -70,11 +76,13 @@ class RatingServiceImplTest {
     void getRatingsByCakeId_ShouldReturnList() {
         when(ratingRepository.findByCakeId(10L)).thenReturn(List.of(sampleRating));
         when(ratingMapper.toResponse(sampleRating)).thenReturn(sampleResponse);
+        when(userServiceClient.getUsername(101L)).thenReturn("testUser");
 
         List<RatingResponse> ratings = ratingService.getRatingsByCakeId(10L);
 
         assertEquals(1, ratings.size());
         assertEquals(5, ratings.get(0).getScore());
+        assertEquals("testUser", ratings.get(0).getUsername());
     }
 
     @Test
